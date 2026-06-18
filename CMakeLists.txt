@@ -59,5 +59,11 @@ set(REA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rea/frontend_hooks.c
 )
 
-add_executable(rea ${REA_SOURCES})
-target_link_libraries(rea PRIVATE pscal_core_static Threads::Threads m)
+# Build the standalone `rea` executable only when this repo is the top-level
+# project. When rea is consumed via FetchContent / add_subdirectory (e.g. by the
+# aether repo, which compiles these engine sources into its own binary), the
+# `rea` binary is unused, so skip it.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    add_executable(rea ${REA_SOURCES})
+    target_link_libraries(rea PRIVATE pscal_core_static Threads::Threads m)
+endif()
