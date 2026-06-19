@@ -3563,6 +3563,19 @@ static AST *parseConstDecl(ReaParser *p) {
     Token *nameTok = newToken(TOKEN_IDENTIFIER, lex, p->current.line, 0);
     free(lex);
     reaAdvance(p); // consume name
+
+    // Fixed-size array constants mirror parseVarDecl: a '[' suffix after the
+    // name wraps the element type in an AST_ARRAY_TYPE and promotes the
+    // declared type to TYPE_ARRAY, e.g. `const int xs[3] = [1,2,3];`.
+    if (p->current.type == REA_TOKEN_LEFT_BRACKET) {
+        if (!typeNode) {
+            fprintf(stderr, "L%d: Array constant requires an element type.\n", p->current.line);
+            p->hadError = true;
+            return NULL;
+        }
+        typeNode = parseArrayType(p, typeNode, &vtype, true);
+    }
+
     if (p->current.type != REA_TOKEN_EQUAL) return NULL;
     reaAdvance(p);
     AST *value = parseExpression(p);
@@ -3570,16 +3583,22 @@ static AST *parseConstDecl(ReaParser *p) {
     AST *node = newASTNode(AST_CONST_DECL, nameTok);
     setLeft(node, value);
     if (typeNode) setRight(node, typeNode);
-    if (value) setTypeAST(node, value->var_type);
-    if (value) {
-        Value v = evaluateCompileTimeValue(value);
-        if (v.type != TYPE_VOID && v.type != TYPE_UNKNOWN) {
-            if (p->functionDepth == 0) {
-                addCompilerConstant(nameTok->value, &v, nameTok->line);
+    if (vtype == TYPE_ARRAY) {
+        // The declared array type wins; the literal is materialised by the
+        // compiler's CONST_DECL path rather than as a scalar compiler constant.
+        setTypeAST(node, TYPE_ARRAY);
+    } else {
+        if (value) setTypeAST(node, value->var_type);
+        if (value) {
+            Value v = evaluateCompileTimeValue(value);
+            if (v.type != TYPE_VOID && v.type != TYPE_UNKNOWN) {
+                if (p->functionDepth == 0) {
+                    addCompilerConstant(nameTok->value, &v, nameTok->line);
+                }
+                if (!typeNode) setTypeAST(node, v.type);
             }
-            if (!typeNode) setTypeAST(node, v.type);
+            freeValue(&v);
         }
-        freeValue(&v);
     }
     return node;
 }
