@@ -1047,6 +1047,61 @@ static AST *parseFactor(ReaParser *p) {
         }
         if (args) freeAST(args);
         setTypeAST(node, TYPE_POINTER);
+        // Optional record-literal initializer: new Class { field: value, ... }.
+        // Semantically identical to `new Class()` followed by assigning each named
+        // field. Stored on the node's `extra` slot as an AST_COMPOUND of AST_ASSIGN
+        // (left = AST_VARIABLE field name, right = value), matching the shape the
+        // compiler's field-init path consumes. Partial sets are allowed (unset
+        // fields keep their default initializers) and a trailing comma is tolerated.
+        if (p->current.type == REA_TOKEN_LEFT_BRACE) {
+            reaAdvance(p); // consume '{'
+            AST *inits = newASTNode(AST_COMPOUND, NULL);
+            while (p->current.type != REA_TOKEN_RIGHT_BRACE && p->current.type != REA_TOKEN_EOF) {
+                if (!tokenIsIdentifierLike(p->current.type)) {
+                    fprintf(stderr, "L%d: Expected field name in record initializer.\n", p->current.line);
+                    p->hadError = true;
+                    break;
+                }
+                char *fl = (char *)malloc(p->current.length + 1);
+                if (!fl) break;
+                memcpy(fl, p->current.start, p->current.length);
+                fl[p->current.length] = '\0';
+                Token *fieldTok = newToken(TOKEN_IDENTIFIER, fl, p->current.line, 0);
+                free(fl);
+                reaAdvance(p); // consume field name
+                if (p->current.type != REA_TOKEN_COLON) {
+                    fprintf(stderr, "L%d: Expected ':' after field name in record initializer.\n", p->current.line);
+                    p->hadError = true;
+                    if (fieldTok) freeToken(fieldTok);
+                    break;
+                }
+                Token *assignTok = newToken(TOKEN_ASSIGN, ":", fieldTok->line, 0);
+                reaAdvance(p); // consume ':'
+                AST *value = parseExpression(p);
+                if (!value) {
+                    if (fieldTok) freeToken(fieldTok);
+                    if (assignTok) freeToken(assignTok);
+                    break;
+                }
+                AST *fieldVar = newASTNode(AST_VARIABLE, fieldTok);
+                AST *fieldAssign = newASTNode(AST_ASSIGN, assignTok);
+                setLeft(fieldAssign, fieldVar);
+                setRight(fieldAssign, value);
+                addChild(inits, fieldAssign);
+                if (p->current.type == REA_TOKEN_COMMA) {
+                    reaAdvance(p); // consume ',' (trailing comma tolerated by loop guard)
+                    continue;
+                }
+                break;
+            }
+            if (p->current.type == REA_TOKEN_RIGHT_BRACE) {
+                reaAdvance(p); // consume '}'
+            } else {
+                fprintf(stderr, "L%d: Expected '}' to close record initializer.\n", p->current.line);
+                p->hadError = true;
+            }
+            setExtra(node, inits);
+        }
         // Support chaining: new Class().method(...) or field access
         while (p->current.type == REA_TOKEN_DOT || p->current.type == REA_TOKEN_LEFT_BRACKET) {
             if (p->current.type == REA_TOKEN_LEFT_BRACKET) {

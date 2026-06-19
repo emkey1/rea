@@ -4061,6 +4061,29 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                 }
             }
         }
+    } else if (node->type == AST_NEW) {
+        /* `new T(args)` plus an optional record-literal initializer
+         * `new T { field: value, ... }`. The constructor arguments live in
+         * `children`; the field initializers live in `extra` as an AST_COMPOUND of
+         * AST_ASSIGN(left = bare field-name AST_VARIABLE, right = value). Validate
+         * the constructor args and each initializer VALUE, but deliberately skip the
+         * field-name variable nodes -- they name record members, not in-scope
+         * identifiers, so feeding them to the generic AST_VARIABLE check would raise
+         * spurious 'not in scope' errors. Returning here also avoids the default
+         * recursion that would otherwise walk those field-name nodes. */
+        for (int i = 0; i < node->child_count; i++) {
+            if (node->children[i]) validateNodeInternal(node->children[i], clsContext);
+        }
+        if (node->extra && node->extra->type == AST_COMPOUND) {
+            for (int i = 0; i < node->extra->child_count; i++) {
+                AST *fieldAssign = node->extra->children[i];
+                if (fieldAssign && fieldAssign->right) {
+                    validateNodeInternal(fieldAssign->right, clsContext);
+                }
+            }
+        }
+        if (pushedGenericFrame) popGenericFrame();
+        return;
     } else if (node->type == AST_ARRAY_ACCESS) {
         if (node->left) validateNodeInternal(node->left, clsContext);
         for (int i = 0; i < node->child_count; i++) {
