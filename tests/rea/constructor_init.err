@@ -1,0 +1,42 @@
+--- Compiling Main Program AST to Bytecode ---
+== Disassembly: rea/constructor_init.rea ==
+Offset Line Opcode           Operand  Value / Target (Args)
+------ ---- ---------------- -------- --------------------------
+0000    0 CONSTANT            1 'nil'
+0002    | DEFINE_GLOBAL    NameIdx:0   'myself' Type:POINTER ('')
+0007    1 JUMP                9 (to 0019)
+
+--- Procedure point.point (at 0010) ---
+0010    | GET_LOCAL           1 (slot)
+0012    | GET_LOCAL           0 (slot)
+0014    | GET_FIELD_OFFSET    1 (index)
+0016    | SWAP
+0017    | SET_INDIRECT
+0018    | RETURN
+0019    2 DEFINE_GLOBAL    NameIdx:3   'p' Type:POINTER ('Point')
+0024    | ALLOC_OBJECT        2 (fields)
+0026    | DUP
+0027    | GET_FIELD_OFFSET    0 (index)
+0029    | CONSTANT            5 'Value type POINTER'
+0031    | SET_INDIRECT
+0032    | DUP
+0033    | GET_FIELD_OFFSET    1 (index)
+0035    | CONSTANT            6 'Value type INT64'
+0037    | SET_INDIRECT
+0038    | DUP
+0039    | PUSH_IMM_I8         5
+0041    | CALL_USER_PROC       8 'point.point' @0010 (2 args)
+0045    | SET_GLOBAL          3 'p' cache=0x0
+0055    0 HALT
+== End Disassembly: rea/constructor_init.rea ==
+
+Constants (9):\n  0000: STR   "myself"
+  0001: NIL
+  0002: STR   ""
+  0003: STR   "p"
+  0004: STR   "Point"
+  0005: Value type POINTER
+  0006: Value type INT64
+  0007: INT   5
+  0008: STR   "point.point"
+

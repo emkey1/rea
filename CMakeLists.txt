@@ -66,4 +66,28 @@ set(REA_SOURCES
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     add_executable(rea ${REA_SOURCES})
     target_link_libraries(rea PRIVATE pscal_core_static Threads::Threads m)
+
+    # ---- Install --------------------------------------------------------------
+    # `cmake --install build` puts `rea` on PATH and ships the example programs
+    # and the language docs beside it. These rules live inside the top-level guard
+    # because the `rea` target only exists here; when rea is consumed via
+    # FetchContent (e.g. by aether) there is no `rea` target to install, and the
+    # fetched pscal-core dependency declares no install rules of its own.
+    include(GNUInstallDirs)
+    install(TARGETS rea RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/rea/examples)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/docs/
+            DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+            DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+    # ---- Test -----------------------------------------------------------------
+    # `ctest` runs the .rea conformance corpus in tests/ against the binary just
+    # built. The runner defaults REA_BIN to ./build/rea; pin it at the freshly
+    # built target so out-of-tree build dirs work too.
+    enable_testing()
+    add_test(NAME rea_tests COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run.sh)
+    set_tests_properties(rea_tests PROPERTIES
+        ENVIRONMENT "REA_BIN=$<TARGET_FILE:rea>")
 endif()
