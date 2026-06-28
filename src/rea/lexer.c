@@ -36,7 +36,13 @@ static int match(ReaLexer *lexer, char expected) {
 }
 
 static void consumeDigits(ReaLexer *lexer) {
-    while (isDigit(peek(lexer))) advance(lexer);
+    // Digits, with optional `_` digit separators between digits (e.g. 1_000_000).
+    // A `_` is only consumed when followed by another digit, so a trailing `_`
+    // is left for the next token rather than folded into the number.
+    while (isDigit(peek(lexer)) ||
+           (peek(lexer) == '_' && isDigit(peekNext(lexer)))) {
+        advance(lexer);
+    }
 }
 
 static void consumeExponent(ReaLexer *lexer) {
@@ -406,10 +412,11 @@ ReaToken reaNextToken(ReaLexer *lexer) {
     if (isDigit(c)) {
         if (c == '0' && (peek(lexer) == 'x' || peek(lexer) == 'X')) {
             advance(lexer); // consume 'x'
-            while (isxdigit(peek(lexer))) advance(lexer);
+            while (isxdigit(peek(lexer)) ||
+                   (peek(lexer) == '_' && isxdigit(peekNext(lexer)))) advance(lexer);
             return makeToken(lexer, REA_TOKEN_NUMBER, start);
         }
-        while (isDigit(peek(lexer))) advance(lexer);
+        consumeDigits(lexer); // integer part, with `_` digit separators
         if (peek(lexer) == '.') {
             char next = peekNext(lexer);
             if (isDigit(next)) {

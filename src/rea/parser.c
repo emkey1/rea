@@ -1210,8 +1210,11 @@ static AST *parseFactor(ReaParser *p) {
 
         char *lex = (char *)malloc(len + 1);
         if (!lex) return NULL;
-        memcpy(lex, start, len);
-        lex[len] = '\0';
+        size_t lj = 0;
+        for (size_t li = 0; li < len; li++) {
+            if (start[li] != '_') lex[lj++] = start[li]; // strip `_` digit separators
+        }
+        lex[lj] = '\0';
 
         Token *tok = newToken(ttype, lex, p->current.line, 0);
         free(lex);
