@@ -97,6 +97,15 @@ static void reaHandleSigint(int signo) {
 }
 
 static void reaInstallSigint(void) {
+#if defined(PSCAL_TARGET_IOS)
+    /* iOS owns SIGINT centrally (kept BLOCKED on every thread; a foreground
+     * Ctrl-C is consumed by the tool-runner sigwait catcher -> SIGUSR1 worker
+     * poke -> siglongjmp, plus the VM abort flag the VM polls). Unblocking
+     * SIGINT or installing a competing per-frontend handler here reopened the
+     * race that left SIGINT at SIG_DFL and killed the shell, so this is a
+     * no-op. */
+    (void)reaHandleSigint;
+#else
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGINT);
@@ -106,6 +115,7 @@ static void reaInstallSigint(void) {
     sa.sa_handler = reaHandleSigint;
     sigemptyset(&sa.sa_mask);
     sigaction(SIGINT, &sa, NULL);
+#endif
 }
 
 static const char *REA_USAGE =
