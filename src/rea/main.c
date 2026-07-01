@@ -357,7 +357,20 @@ static void extractDiagnosticCode(ParsedDiagnostic *diag) {
     const char *after;
     char *strippedMessage;
 
-    if (!diag || !diag->message || diag->message[0] != '[') {
+    if (!diag || !diag->message) {
+        return;
+    }
+    if (diag->message[0] != '[') {
+        /* No explicit [CODE] prefix. Fall back to the registered frontend's code
+         * inference so a raw backend/codegen message -- e.g. the codegen
+         * "Compiler error: Unknown field 'x'." that can slip past the semantic
+         * FIELD-002 check, or any other uncoded-but-recognized message -- still
+         * carries its code in --diagnostics-json. No-op when no frontend hook is
+         * registered (plain rea) or the message matches no known pattern. */
+        const char *inferred = reaFrontendInferDiagnosticCode(NULL, diag->message);
+        if (inferred) {
+            diag->code = diagDupRange(inferred, inferred + strlen(inferred));
+        }
         return;
     }
 
