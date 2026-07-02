@@ -96,3 +96,12 @@ frontend could reuse.
 - Diagnostics-JSON collector help:-line junk entry — FIXED (2026-07-01):
   `help:` lines now fold into the preceding diagnostic's hint like `hint:`
   lines, so a coded diagnostic is one JSON entry.
+- Unknown-type diagnostics gap (found during the 2026-07-01 forward-reference
+  fix): a field/var typed with a name that never resolves (a typo like
+  `Bogus b;`) still parses silently and only fails at runtime
+  ("makeValueForType called with unhandled type 0"). The post-parse
+  forward-reference pass in parser.c (reaResolveForwardClassRefs) is the
+  natural place to report "unknown type 'X'" at parse time — the blocker is
+  that generic type parameters also appear as unresolved TYPE_UNKNOWN
+  references there, so the pass would need to know which references sit
+  inside a generic scope before it can complain about the rest.

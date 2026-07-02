@@ -1,0 +1,56 @@
+// Fields typed as a class declared LATER in the file are class references
+// stored as pointers and default to nil, exactly like backward references.
+// Regression: lookupType failed for the not-yet-registered name, so the field
+// missed the pointer path in parseVarDecl and was left as a bare TYPE_UNKNOWN
+// reference that pscal-core later resolved by EMBEDDING the record inline --
+// one field silently got record semantics (x.b == nil errored on a RECORD
+// operand) while every other class-typed field was a nil reference.
+class A {
+  B b;                          // forward: B is declared below
+}
+class B {
+  A a;                          // backward: A is already registered
+}
+
+A x = new A();
+writeln(x.b == nil);            // forward-typed field defaults to nil
+writeln(x.b == x.b);            // nil compares equal to itself
+x.b = new B();
+writeln(x.b.a == nil);          // mutual reference, backward side also nil
+x.b.a = x;                      // close the cycle: references, not embedding
+writeln(x.b.a == x);
+writeln(x.b.a.b == x.b);        // traverse the cycle both ways
+
+class Owner {
+  Pet pet;
+  int n;
+  Pet adopt(int tag) {          // method whose body uses the forward class
+    my.pet = new Pet();
+    my.pet.tag = tag;
+    return my.pet;
+  }
+  int probe() {
+    Pet tmp = new Pet();        // forward class as a method local
+    tmp.tag = 41;
+    return tmp.tag + 1;
+  }
+}
+class Litter {
+  Pet pups[2];                  // array field: elements are references too
+}
+class Pet { int tag; }
+
+Owner o = new Owner();
+writeln(o.pet == nil);
+Pet p;                          // global initializers hoist above statements,
+p = o.adopt(7);                 // so keep the side effect in statement order
+writeln(p == o.pet);            // reference semantics: same object
+p.tag = 8;
+writeln(o.pet.tag);             // mutation visible through both references
+writeln(o.probe());
+
+Litter lt = new Litter();
+writeln(lt.pups[0] == nil);     // array elements default to nil
+lt.pups[1] = new Pet();
+lt.pups[1].tag = 9;
+writeln(lt.pups[1].tag);

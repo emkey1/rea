@@ -2638,7 +2638,10 @@ static AST *parseVarDecl(ReaParser *p) {
             vtype = resolvedVarType;
         }
 
-        if (resolvedType && !resolvedType->token) {
+        /* rea_lookupType fabricates a transient AST_VARIABLE node (token-less)
+         * for builtin type names; those are ours to free. Anything else is the
+         * type table's own AST — freeing it would leave a dangling entry. */
+        if (resolvedType && !resolvedType->token && resolvedType->type == AST_VARIABLE) {
             freeAST(resolvedType);
         }
 
@@ -4142,8 +4145,11 @@ static AST *parseStatement(ReaParser *p) {
             }
         }
 
-        // Parse class body
-        AST *recordAst = newASTNode(AST_RECORD_TYPE, NULL);
+        // Parse class body. The record node carries the class-name token so
+        // type-table entries for classes are distinguishable from the
+        // transient token-less builtin nodes rea_lookupType fabricates
+        // (callers free those; they must never free a table entry).
+        AST *recordAst = newASTNode(AST_RECORD_TYPE, classNameTok);
         if (parentRef) setExtra(recordAst, parentRef);
         // Inject hidden vtable pointer field as first record member
         Token *vtTok = newToken(TOKEN_IDENTIFIER, "__vtable", classNameTok->line, 0);
@@ -4158,6 +4164,15 @@ static AST *parseStatement(ReaParser *p) {
         setRight(vtDecl, vtType);
         setTypeAST(vtDecl, TYPE_POINTER);
         addChild(recordAst, vtDecl);
+        // Pre-register the class before parsing its body so self-referential
+        // fields (e.g. a linked-list `M next;`) resolve to the class and take
+        // the pointer path in parseVarDecl instead of being left as an
+        // unresolved reference that later embeds the record into itself
+        // (infinite recursion in createEmptyRecord). The post-body
+        // insertType below re-registers the completed layout.
+        if (classNameTok->value) {
+            insertType(classNameTok->value, recordAst);
+        }
         AST *methods = newASTNode(AST_COMPOUND, NULL);
         const char* prevClass = p->currentClassName;
         const char* prevParent = p->currentParentClassName;
@@ -4311,7 +4326,7 @@ static AST *parseStatement(ReaParser *p) {
 
         AST *tdef = lookupType(namebuf);
         if (tdef) {
-            if (!tdef->token) {
+            if (!tdef->token && tdef->type == AST_VARIABLE) {
                 freeAST(tdef);
             }
             if (nextCanDeclareWithType) {
@@ -4330,6 +4345,81 @@ static AST *parseStatement(ReaParser *p) {
     AST *stmt = newASTNode(AST_EXPR_STMT, expr->token);
     setLeft(stmt, expr);
     return stmt;
+}
+
+/* --- Forward-referenced class fields --------------------------------------
+ * While parsing `class A { B b; }` with B declared later in the file,
+ * lookupType("B") fails, so parseVarDecl leaves the field as a bare
+ * AST_TYPE_REFERENCE with TYPE_UNKNOWN instead of the pointer-to-class shape
+ * it builds for already-known classes. pscal-core's makeValueForType then
+ * resolves the name at `new` time and EMBEDS a B record inline — one field
+ * silently gets record semantics while every other class-typed field is a
+ * nil reference. Once the whole file has parsed, every class is in the type
+ * table, so revisit unresolved references and rewrite the ones that turned
+ * out to name a class/record into the pointer shape. Names that still do not
+ * resolve (generic type parameters, genuine unknowns) are left untouched. */
+static bool reaRefResolvesToClass(AST *ref) {
+    if (!ref || ref->type != AST_TYPE_REFERENCE || ref->var_type != TYPE_UNKNOWN) return false;
+    if (!ref->token || !ref->token->value) return false;
+    AST *resolved = lookupType(ref->token->value);
+    if (!resolved) return false;
+    bool classLike = resolved->type == AST_RECORD_TYPE ||
+                     resolved->var_type == TYPE_RECORD ||
+                     resolved->var_type == TYPE_POINTER; /* mirror parseVarDecl */
+    /* rea_lookupType fabricates transient token-less AST_VARIABLE nodes for
+     * builtin names; those are ours to free (same rule as parseVarDecl). */
+    if (!resolved->token && resolved->type == AST_VARIABLE) {
+        freeAST(resolved);
+    }
+    return classLike;
+}
+
+static AST *reaWrapClassRefInPointer(AST *ref) {
+    setTypeAST(ref, TYPE_RECORD);
+    AST *ptrNode = newASTNode(AST_POINTER_TYPE, NULL);
+    setTypeAST(ptrNode, TYPE_POINTER);
+    setRight(ptrNode, ref);
+    return ptrNode;
+}
+
+static void reaResolveForwardClassRefs(AST *node) {
+    if (!node) return;
+    if (node->type == AST_TYPE_DECL && node->left &&
+        node->left->type == AST_RECORD_TYPE &&
+        node->token && node->token->value) {
+        /* insertType deep-copies, so the type table's entry for this class
+         * (registered mid-parse) still holds the unresolved reference the
+         * program AST does. rea_lookupType returns the table's own AST, so
+         * fix it in place as well — createEmptyRecord builds `new` instances
+         * from the table copy, not from the program AST. */
+        AST *entry = lookupType(node->token->value);
+        if (entry && entry != node->left) {
+            if (!entry->token && entry->type == AST_VARIABLE) {
+                freeAST(entry); /* transient builtin (see reaRefResolvesToClass) */
+            } else if (entry->type == AST_RECORD_TYPE) {
+                reaResolveForwardClassRefs(entry);
+            }
+        }
+    }
+    if (node->type == AST_VAR_DECL && reaRefResolvesToClass(node->right)) {
+        setRight(node, reaWrapClassRefInPointer(node->right));
+        setTypeAST(node, TYPE_POINTER);
+        for (int i = 0; i < node->child_count; i++) {
+            AST *v = node->children[i];
+            if (v && v->type == AST_VARIABLE && v->var_type == TYPE_UNKNOWN) {
+                setTypeAST(v, TYPE_POINTER);
+            }
+        }
+    } else if (node->type == AST_ARRAY_TYPE && reaRefResolvesToClass(node->right)) {
+        /* array of a forward-declared class: elements are references too */
+        setRight(node, reaWrapClassRefInPointer(node->right));
+    }
+    reaResolveForwardClassRefs(node->left);
+    reaResolveForwardClassRefs(node->right);
+    reaResolveForwardClassRefs(node->extra);
+    for (int i = 0; i < node->child_count; i++) {
+        reaResolveForwardClassRefs(node->children[i]);
+    }
 }
 
 AST *parseRea(const char *source) {
@@ -4414,6 +4504,12 @@ AST *parseRea(const char *source) {
             addChild(stmts, stmt);
             
         }
+    }
+
+    /* All classes are registered now; give forward-referenced class fields
+     * the same pointer semantics backward references get (see helpers above). */
+    if (!p.hadError) {
+        reaResolveForwardClassRefs(program);
     }
 
     AST **function_body_nodes = NULL;

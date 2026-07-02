@@ -1,0 +1,43 @@
+// Self-referential class fields (e.g. a linked-list `Node next;`) are class
+// references stored as pointers and default to nil. Regression: the parser
+// used to register a class type only after its body, so a field typed as the
+// enclosing class missed the pointer path and later embedded the record into
+// itself — infinite recursion (segfault) in createEmptyRecord at `new`.
+class Node {
+  int v;
+  Node next;
+}
+
+Node head = new Node();
+writeln(head.next == nil);      // self-typed field defaults to nil
+head.v = 1;
+head.next = new Node();
+head.next.v = 2;
+head.next.next = nil;
+Node cur = head;                // list traversal through the self-typed link
+while (cur != nil) {
+  writeln(cur.v);
+  cur = cur.next;
+}
+
+class Tree extends Node {
+  Tree left;                    // self-reference alongside inheritance
+  Tree right;
+}
+Tree t = new Tree();
+writeln(t.left == nil);
+writeln(t.next == nil);         // inherited self-typed field still nil
+
+class Chain {
+  int id;
+  Chain link;
+  Chain(int n) { my.id = n; }
+  Chain grow(int n) {           // method returning the enclosing class type
+    my.link = new Chain(n);
+    return my.link;
+  }
+}
+Chain a = new Chain(10);
+Chain b = a.grow(20);
+writeln(a.link.id);
+writeln(b.link == nil);
