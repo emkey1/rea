@@ -10,6 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <ctype.h>
 #include <limits.h>
 #include "core/list.h"
@@ -45,6 +46,29 @@ static void reaAdvance(ReaParser *p) { p->current = reaNextToken(&p->lexer); }
 static ReaToken reaPeekToken(ReaParser *p) {
     ReaLexer saved = p->lexer;
     return reaNextToken(&saved);
+}
+
+/* Count of user-facing diagnostics written to stderr during the current parse.
+ * Every parser diagnostic funnels through reaDiagf (all `reaDiagf( ...)`
+ * sites in this file were mechanically routed to it), so a nonzero count means
+ * the user already has something to react to. parseRea resets this to 0 before
+ * its parse loop and, if it bails with p.hadError while this count is still 0,
+ * emits a final backstop error anchored at the stalled token so a parse failure
+ * is never silent (exit 1 with empty stderr was the worst case for both humans
+ * and LLM repair loops -- nothing to react to). Mirrors aether's
+ * g_aetherAstDiagCount backstop (ast_parser.c). */
+static int g_reaParseDiagCount = 0;
+
+/* stderr diagnostic sink: identical to reaDiagf( ...) but bumps the
+ * emitted-diagnostic counter so the silent-failure backstop can tell whether
+ * the parse said anything. */
+static int reaDiagf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    g_reaParseDiagCount++;
+    return r;
 }
 
 static VarType inferReaStringLiteralType(const char *text, size_t len) {
@@ -109,7 +133,7 @@ static void ensureGenericFrameCapacity(ReaParser *p) {
         int newCap = p->genericFrameCapacity ? p->genericFrameCapacity * 2 : 8;
         int *resized = (int *)realloc(p->genericFrameStack, (size_t)newCap * sizeof(int));
         if (!resized) {
-            fprintf(stderr, "Memory allocation failure expanding generic frame stack.\n");
+            reaDiagf( "Memory allocation failure expanding generic frame stack.\n");
             EXIT_FAILURE_HANDLER();
         }
         p->genericFrameStack = resized;
@@ -132,7 +156,7 @@ static void ensureGenericNameCapacity(ReaParser *p) {
         int newCap = p->genericTypeCapacity ? p->genericTypeCapacity * 2 : 16;
         char **resized = (char **)realloc(p->genericTypeNames, (size_t)newCap * sizeof(char *));
         if (!resized) {
-            fprintf(stderr, "Memory allocation failure expanding generic parameter table.\n");
+            reaDiagf( "Memory allocation failure expanding generic parameter table.\n");
             EXIT_FAILURE_HANDLER();
         }
         for (int i = p->genericTypeCapacity; i < newCap; i++) {
@@ -163,7 +187,7 @@ static bool addGenericParam(ReaParser *p, const char *name, int line) {
     int frameStart = p->genericFrameStack[p->genericFrameDepth - 1];
     for (int i = frameStart; i < p->genericTypeCount; i++) {
         if (p->genericTypeNames[i] && strcasecmp(p->genericTypeNames[i], name) == 0) {
-            fprintf(stderr, "L%d: duplicate generic parameter '%s'.\n", line, name);
+            reaDiagf( "L%d: duplicate generic parameter '%s'.\n", line, name);
             p->hadError = true;
             return false;
         }
@@ -171,7 +195,7 @@ static bool addGenericParam(ReaParser *p, const char *name, int line) {
     ensureGenericNameCapacity(p);
     p->genericTypeNames[p->genericTypeCount] = strdup(name);
     if (!p->genericTypeNames[p->genericTypeCount]) {
-        fprintf(stderr, "Memory allocation failure storing generic parameter name.\n");
+        reaDiagf( "Memory allocation failure storing generic parameter name.\n");
         EXIT_FAILURE_HANDLER();
     }
     p->genericTypeCount++;
@@ -458,14 +482,14 @@ static AST *parseArrayType(ReaParser *p, AST *baseType, VarType *vtype_out, bool
         if (p->current.type == REA_TOKEN_RIGHT_BRACKET) {
             reaAdvance(p);
         } else {
-            fprintf(stderr, "L%d: Expected ']' to close array bounds.\n", p->current.line);
+            reaDiagf( "L%d: Expected ']' to close array bounds.\n", p->current.line);
             p->hadError = true;
             break;
         }
 
         if (openDimension) {
             if (!allowOpen) {
-                fprintf(stderr, "L%d: Missing array size.\n", line);
+                reaDiagf( "L%d: Missing array size.\n", line);
                 p->hadError = true;
             }
             continue;
@@ -478,7 +502,7 @@ static AST *parseArrayType(ReaParser *p, AST *baseType, VarType *vtype_out, bool
             if (v.type == TYPE_INT64 || v.type == TYPE_INT32 || v.type == TYPE_INT16 || v.type == TYPE_INT8 || v.type == TYPE_UINT64 || v.type == TYPE_UINT32 || v.type == TYPE_UINT16 || v.type == TYPE_UINT8 || v.type == TYPE_WORD || v.type == TYPE_BYTE || v.type == TYPE_INTEGER) {
                 high = (int)v.i_val - 1;
             } else {
-                fprintf(stderr, "L%d: Array size must be a constant integer.\n", line);
+                reaDiagf( "L%d: Array size must be a constant integer.\n", line);
             }
             freeValue(&v);
             freeAST(dimExpr);
@@ -554,14 +578,14 @@ static AST *parseGenericParameterList(ReaParser *p) {
     AST *list = newASTNode(AST_COMPOUND, NULL);
     while (p->current.type != REA_TOKEN_GREATER && p->current.type != REA_TOKEN_EOF) {
         if (!tokenIsIdentifierLike(p->current.type)) {
-            fprintf(stderr, "L%d: Expected generic parameter name.\n", p->current.line);
+            reaDiagf( "L%d: Expected generic parameter name.\n", p->current.line);
             p->hadError = true;
             freeAST(list);
             return NULL;
         }
         char *paramName = (char *)malloc(p->current.length + 1);
         if (!paramName) {
-            fprintf(stderr, "Memory allocation failure while parsing generic parameter.\n");
+            reaDiagf( "Memory allocation failure while parsing generic parameter.\n");
             EXIT_FAILURE_HANDLER();
         }
         memcpy(paramName, p->current.start, p->current.length);
@@ -581,7 +605,7 @@ static AST *parseGenericParameterList(ReaParser *p) {
         break;
     }
     if (p->current.type != REA_TOKEN_GREATER) {
-        fprintf(stderr, "L%d: Expected '>' to close generic parameter list.\n", p->current.line);
+        reaDiagf( "L%d: Expected '>' to close generic parameter list.\n", p->current.line);
         p->hadError = true;
         freeAST(list);
         return NULL;
@@ -878,7 +902,7 @@ static AST *parseFactor(ReaParser *p) {
         AST *target = parseFactor(p);
         if (!target) return NULL;
         if (!(target->type == AST_VARIABLE || target->type == AST_FIELD_ACCESS || target->type == AST_ARRAY_ACCESS || target->type == AST_DEREFERENCE)) {
-            fprintf(stderr, "L%d: Parse error: increment/decrement requires a variable (lvalue).\n", line);
+            reaDiagf( "L%d: Parse error: increment/decrement requires a variable (lvalue).\n", line);
             p->hadError = true;
             return NULL;
         }
@@ -1058,7 +1082,7 @@ static AST *parseFactor(ReaParser *p) {
             AST *inits = newASTNode(AST_COMPOUND, NULL);
             while (p->current.type != REA_TOKEN_RIGHT_BRACE && p->current.type != REA_TOKEN_EOF) {
                 if (!tokenIsIdentifierLike(p->current.type)) {
-                    fprintf(stderr, "L%d: Expected field name in record initializer.\n", p->current.line);
+                    reaDiagf( "L%d: Expected field name in record initializer.\n", p->current.line);
                     p->hadError = true;
                     break;
                 }
@@ -1070,7 +1094,7 @@ static AST *parseFactor(ReaParser *p) {
                 free(fl);
                 reaAdvance(p); // consume field name
                 if (p->current.type != REA_TOKEN_COLON) {
-                    fprintf(stderr, "L%d: Expected ':' after field name in record initializer.\n", p->current.line);
+                    reaDiagf( "L%d: Expected ':' after field name in record initializer.\n", p->current.line);
                     p->hadError = true;
                     if (fieldTok) freeToken(fieldTok);
                     break;
@@ -1097,7 +1121,7 @@ static AST *parseFactor(ReaParser *p) {
             if (p->current.type == REA_TOKEN_RIGHT_BRACE) {
                 reaAdvance(p); // consume '}'
             } else {
-                fprintf(stderr, "L%d: Expected '}' to close record initializer.\n", p->current.line);
+                reaDiagf( "L%d: Expected '}' to close record initializer.\n", p->current.line);
                 p->hadError = true;
             }
             setExtra(node, inits);
@@ -1176,7 +1200,7 @@ static AST *parseFactor(ReaParser *p) {
         }
 
         if (p->current.type != REA_TOKEN_RIGHT_BRACKET) {
-            fprintf(stderr, "L%d: Expected ']' to close array literal.\n", line);
+            reaDiagf( "L%d: Expected ']' to close array literal.\n", line);
             p->hadError = true;
         } else {
             reaAdvance(p);
@@ -1621,7 +1645,7 @@ static AST *parseTerm(ReaParser *p) {
         bool integerOnlyOp = (tt == TOKEN_INT_DIV || tt == TOKEN_MOD);
         bool forceReal = (tt == TOKEN_SLASH) || (!integerOnlyOp && (leftReal || rightReal));
         if (integerOnlyOp && (leftReal || rightReal)) {
-            fprintf(stderr, "L%d: Operands for '%s' must be integers.\n",
+            reaDiagf( "L%d: Operands for '%s' must be integers.\n",
                     op.line, tt == TOKEN_INT_DIV ? "div" : "mod");
             p->hadError = true;
         }
@@ -1896,7 +1920,7 @@ static AST *parseConditional(ReaParser *p) {
     }
 
     if (p->current.type != REA_TOKEN_COLON) {
-        fprintf(stderr, "L%d: Expected ':' in conditional expression.\n", p->current.line);
+        reaDiagf( "L%d: Expected ':' in conditional expression.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
@@ -2099,7 +2123,7 @@ static void parseTypeArgumentsIfPresent(ReaParser *p, AST *typeRef) {
         break;
     }
     if (p->current.type != REA_TOKEN_GREATER) {
-        fprintf(stderr, "L%d: Expected '>' to close type argument list.\n", p->current.line);
+        reaDiagf( "L%d: Expected '>' to close type argument list.\n", p->current.line);
         p->hadError = true;
         return;
     }
@@ -2122,7 +2146,7 @@ static AST *parseCallTypeArgumentList(ReaParser *p) {
         break;
     }
     if (p->current.type != REA_TOKEN_GREATER) {
-        fprintf(stderr, "L%d: Expected '>' to close call type argument list.\n", p->current.line);
+        reaDiagf( "L%d: Expected '>' to close call type argument list.\n", p->current.line);
         p->hadError = true;
         freeAST(list);
         return NULL;
@@ -2267,7 +2291,7 @@ static AST *parsePointerParamType(ReaParser *p) {
             setTypeAST(genericNode, TYPE_UNKNOWN);
             reaAdvance(p);
             if (p->current.type == REA_TOKEN_LESS) {
-                fprintf(stderr, "L%d: Generic parameter '%s' cannot specify type arguments.\n",
+                reaDiagf( "L%d: Generic parameter '%s' cannot specify type arguments.\n",
                         tok.line, typeTok->value);
                 p->hadError = true;
             }
@@ -2280,14 +2304,14 @@ static AST *parsePointerParamType(ReaParser *p) {
         return refNode;
     }
 
-    fprintf(stderr, "L%d: expected type name in function pointer signature.\n", tok.line);
+    reaDiagf( "L%d: expected type name in function pointer signature.\n", tok.line);
     p->hadError = true;
     return NULL;
 }
 
 static AST *parseFunctionPointerParamTypes(ReaParser *p) {
     if (p->current.type != REA_TOKEN_LEFT_PAREN) {
-        fprintf(stderr, "L%d: expected '(' to begin function pointer signature.\n", p->current.line);
+        reaDiagf( "L%d: expected '(' to begin function pointer signature.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
@@ -2332,7 +2356,7 @@ static AST *parseFunctionPointerParamTypes(ReaParser *p) {
     }
 
     if (p->current.type != REA_TOKEN_RIGHT_PAREN) {
-        fprintf(stderr, "L%d: expected ')' to close function pointer signature.\n", p->current.line);
+        reaDiagf( "L%d: expected ')' to close function pointer signature.\n", p->current.line);
         p->hadError = true;
         freeAST(params);
         return NULL;
@@ -2371,7 +2395,7 @@ static AST *buildProcPointerType(AST *returnType, AST *paramList) {
 
 static AST *parsePointerVariableAfterName(ReaParser *p, Token *nameTok, AST *baseType) {
     if (p->current.type != REA_TOKEN_RIGHT_PAREN) {
-        fprintf(stderr, "L%d: expected ')' after function pointer declarator.\n", p->current.line);
+        reaDiagf( "L%d: expected ')' after function pointer declarator.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
@@ -2400,6 +2424,116 @@ static AST *parsePointerVariableAfterName(ReaParser *p, Token *nameTok, AST *bas
     }
 
     return varDecl;
+}
+
+/* ------------------------------------------------------------------ */
+/* Constant class-field default values (`int count = 0;` in a class)   */
+/* ------------------------------------------------------------------ */
+
+/* A declared field default must be a compile-time constant: the construction
+ * path (pscal-core's emitDefaultFieldInitializers) compiles the field decl's
+ * `left` expression into every `new T()` and every unset field of
+ * `new T { ... }`. Allow literals, the (again constant) array literal, and
+ * constant unary/binary expressions over them; reject anything that reads
+ * another field, `myself`, or calls a function -- those have evaluation-order
+ * and purity concerns and belong in a constructor or a `new T { field: value }`
+ * initializer. Mirrors aetherFieldDefaultIsConstant (aether FIELD-003). */
+static bool reaFieldDefaultIsConstant(const AST *e) {
+    if (!e) return false;
+    switch (e->type) {
+        case AST_NUMBER:
+        case AST_STRING:
+        case AST_BOOLEAN:
+        case AST_NIL:
+            return true;
+        case AST_UNARY_OP:
+            return reaFieldDefaultIsConstant(e->left);
+        case AST_BINARY_OP:
+            return reaFieldDefaultIsConstant(e->left) &&
+                   reaFieldDefaultIsConstant(e->right);
+        case AST_ARRAY_LITERAL:
+            for (int i = 0; i < e->child_count; i++) {
+                if (!reaFieldDefaultIsConstant(e->children[i])) return false;
+            }
+            return true;
+        default:
+            return false;
+    }
+}
+
+/* Type-check a constant field default against the field's declared type. An
+ * int default widens into a real field; a field type we do not model precisely
+ * stays permissive (the constant guard above still applies) so inference gaps
+ * never raise a false type error. Mirrors aetherFieldDefaultTypeMatches. */
+static bool reaFieldDefaultTypeMatches(VarType fieldType, const AST *e) {
+    if (!e) return false;
+    VarType et = e->var_type;
+    if (isIntegerFamilyType(fieldType)) {
+        return isIntegerFamilyType(et);
+    }
+    if (isRealType(fieldType)) {
+        return isRealType(et) || isIntegerFamilyType(et);
+    }
+    if (isPascalStringType(fieldType) || isPascalCharType(fieldType)) {
+        return isPascalStringType(et) || isPascalCharType(et);
+    }
+    if (fieldType == TYPE_BOOLEAN) {
+        return et == TYPE_BOOLEAN;
+    }
+    if (fieldType == TYPE_ARRAY) {
+        return et == TYPE_ARRAY || et == TYPE_NIL;
+    }
+    /* A class-typed/record field is a pointer; only `nil` is a valid constant. */
+    if (fieldType == TYPE_POINTER || fieldType == TYPE_RECORD || fieldType == TYPE_ENUM) {
+        return et == TYPE_NIL;
+    }
+    return true;
+}
+
+/* Validate a class-field default expression (`int count = <expr>;` directly in
+ * a class body). On success returns the expression unchanged; on any violation
+ * emits a clear parse error, frees the expression, sets p->hadError and returns
+ * NULL so the field falls back to its type-zero default. Semantics match
+ * aether's FIELD-003 checks (ast_parser.c parseTypeDecl). */
+static AST *reaValidateFieldDefault(ReaParser *p, AST *defExpr, VarType fieldType, int eqLine) {
+    if (!defExpr || p->hadError) {
+        if (!p->hadError) {
+            reaDiagf("L%d: expected a constant default value after '=' in class field declaration.\n",
+                     eqLine);
+            p->hadError = true;
+        }
+        if (defExpr) freeAST(defExpr);
+        return NULL;
+    }
+    if (!reaFieldDefaultIsConstant(defExpr)) {
+        reaDiagf("L%d: class field defaults must be compile-time constants "
+                 "(e.g. = 0, = \"\", = true); set computed values in a constructor "
+                 "or with 'new T { field: value }'.\n", eqLine);
+        freeAST(defExpr);
+        p->hadError = true;
+        return NULL;
+    }
+    /* Arrays: only the empty literal `= []` is a supported default (it matches
+     * the zero-initialized field). A populated array literal cannot be applied
+     * by the construction path, so reject it instead of silently dropping the
+     * values. */
+    if (fieldType == TYPE_ARRAY && defExpr->type == AST_ARRAY_LITERAL &&
+        defExpr->child_count > 0) {
+        reaDiagf("L%d: only an empty array default (= []) is supported for array "
+                 "fields; populate array fields in a constructor or method.\n", eqLine);
+        freeAST(defExpr);
+        p->hadError = true;
+        return NULL;
+    }
+    if (!reaFieldDefaultTypeMatches(fieldType, defExpr)) {
+        reaDiagf("L%d: field default type mismatch: cannot use a %s default for a "
+                 "field of type %s.\n", eqLine,
+                 varTypeToString(defExpr->var_type), varTypeToString(fieldType));
+        freeAST(defExpr);
+        p->hadError = true;
+        return NULL;
+    }
+    return defExpr;
 }
 
 static AST *parseVarDecl(ReaParser *p) {
@@ -2452,7 +2586,7 @@ static AST *parseVarDecl(ReaParser *p) {
             int idx = p->currentClassName ? p->currentMethodIndex++ : -1;
             return parseFunctionDecl(p, nameTok, NULL, TYPE_VOID, idx, false);
         } else {
-            fprintf(stderr, "L%d: Variable cannot have type void.\n", p->current.line);
+            reaDiagf( "L%d: Variable cannot have type void.\n", p->current.line);
             p->hadError = true;
             return NULL;
         }
@@ -2608,8 +2742,19 @@ static AST *parseVarDecl(ReaParser *p) {
 
         AST *init = NULL;
         if (p->current.type == REA_TOKEN_EQUAL) {
+            int eqLine = p->current.line;
             reaAdvance(p);
             init = parseExpression(p);
+            /* Directly inside a class body this VAR_DECL is a field and the
+             * initializer is a constant field default: pscal-core's
+             * emitDefaultFieldInitializers applies the decl's `left` at every
+             * `new` (unset fields of `new T { ... }` included; constructors and
+             * later assignments simply overwrite it). Enforce the FIELD-003
+             * constant boundary here exactly as aether does. Locals
+             * (functionDepth > 0) and globals (no class) are unrestricted. */
+            if (p->currentClassName && p->functionDepth == 0) {
+                init = reaValidateFieldDefault(p, init, vtype_local, eqLine);
+            }
         }
 
         AST *decl = newASTNode(AST_VAR_DECL, NULL);
@@ -2713,7 +2858,7 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
                 pvtype = TYPE_UNKNOWN;
                 reaAdvance(p); // consume type identifier
                 if (p->current.type == REA_TOKEN_LESS) {
-                    fprintf(stderr, "L%d: Generic parameter '%s' cannot specify type arguments.\n",
+                    reaDiagf( "L%d: Generic parameter '%s' cannot specify type arguments.\n",
                             typeRefTok->line, typeRefTok->value);
                     p->hadError = true;
                 }
@@ -2762,7 +2907,7 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
                 AST *existingVar = existingDecl->children[pj];
                 if (!existingVar || !existingVar->token || !existingVar->token->value) continue;
                 if (strcasecmp(existingVar->token->value, paramNameTok->value) == 0) {
-                    fprintf(stderr, "L%d: duplicate parameter '%s' in function declaration.\n",
+                    reaDiagf( "L%d: duplicate parameter '%s' in function declaration.\n",
                             paramNameTok->line, paramNameTok->value);
                     p->hadError = true;
                     duplicateParam = true;
@@ -2800,7 +2945,7 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
 
     if (pointerWrapped) {
         if (p->current.type != REA_TOKEN_RIGHT_PAREN) {
-            fprintf(stderr, "L%d: expected ')' after function pointer parameters.\n", p->current.line);
+            reaDiagf( "L%d: expected ')' after function pointer parameters.\n", p->current.line);
             p->hadError = true;
             freeAST(params);
             return NULL;
@@ -3026,7 +3171,7 @@ static AST *parseReturn(ReaParser *p) {
     if (p->current.type != REA_TOKEN_SEMICOLON) {
         value = parseExpression(p);
     } else if (p->currentFunctionType != TYPE_VOID) {
-        fprintf(stderr, "L%d: return requires a value.\n", ret.line);
+        reaDiagf( "L%d: return requires a value.\n", ret.line);
         p->hadError = true;
     }
     if (p->current.type == REA_TOKEN_SEMICOLON) {
@@ -3297,7 +3442,7 @@ static AST *parseTuplePattern(ReaParser *p) {
         if (tokenIsIdentifierLike(p->current.type)) {
             char *lex = (char *)malloc(p->current.length + 1);
             if (!lex) {
-                fprintf(stderr, "Memory allocation failure parsing tuple pattern.\n");
+                reaDiagf( "Memory allocation failure parsing tuple pattern.\n");
                 EXIT_FAILURE_HANDLER();
             }
             memcpy(lex, p->current.start, p->current.length);
@@ -3308,7 +3453,7 @@ static AST *parseTuplePattern(ReaParser *p) {
             addChild(list, binding);
             for (int i = 0; i < nameCount; i++) {
                 if (strcasecmp(names[i], tok->value) == 0) {
-                    fprintf(stderr, "L%d: duplicate pattern binding '%s'.\n", tok->line, tok->value);
+                    reaDiagf( "L%d: duplicate pattern binding '%s'.\n", tok->line, tok->value);
                     p->hadError = true;
                     break;
                 }
@@ -3317,7 +3462,7 @@ static AST *parseTuplePattern(ReaParser *p) {
                 int newCap = nameCap ? nameCap * 2 : 4;
                 const char **resized = (const char **)realloc(names, (size_t)newCap * sizeof(const char *));
                 if (!resized) {
-                    fprintf(stderr, "Memory allocation failure recording tuple pattern names.\n");
+                    reaDiagf( "Memory allocation failure recording tuple pattern names.\n");
                     EXIT_FAILURE_HANDLER();
                 }
                 names = resized;
@@ -3340,7 +3485,7 @@ static AST *parseTuplePattern(ReaParser *p) {
         break;
     }
     if (p->current.type != REA_TOKEN_RIGHT_PAREN) {
-        fprintf(stderr, "L%d: expected ')' to close tuple pattern.\n", startLine);
+        reaDiagf( "L%d: expected ')' to close tuple pattern.\n", startLine);
         p->hadError = true;
     } else {
         reaAdvance(p);
@@ -3356,7 +3501,7 @@ static AST *parseMatchPattern(ReaParser *p) {
     if (tokenIsIdentifierLike(p->current.type)) {
         char *lex = (char *)malloc(p->current.length + 1);
         if (!lex) {
-            fprintf(stderr, "Memory allocation failure parsing pattern binding.\n");
+            reaDiagf( "Memory allocation failure parsing pattern binding.\n");
             EXIT_FAILURE_HANDLER();
         }
         memcpy(lex, p->current.start, p->current.length);
@@ -3379,7 +3524,7 @@ static AST *parseMatchCase(ReaParser *p) {
         guard = parseExpression(p);
     }
     if (p->current.type != REA_TOKEN_ARROW) {
-        fprintf(stderr, "L%d: expected '->' after match pattern.\n", p->current.line);
+        reaDiagf( "L%d: expected '->' after match pattern.\n", p->current.line);
         p->hadError = true;
     } else {
         reaAdvance(p);
@@ -3405,7 +3550,7 @@ static AST *parseMatch(ReaParser *p) {
         return NULL;
     }
     if (p->current.type != REA_TOKEN_LEFT_BRACE) {
-        fprintf(stderr, "L%d: expected '{' to begin match body.\n", p->current.line);
+        reaDiagf( "L%d: expected '{' to begin match body.\n", p->current.line);
         p->hadError = true;
         return expr;
     }
@@ -3423,12 +3568,12 @@ static AST *parseMatch(ReaParser *p) {
         }
         if (p->current.type == REA_TOKEN_DEFAULT) {
             if (sawDefault) {
-                fprintf(stderr, "L%d: multiple default branches in match statement.\n", p->current.line);
+                reaDiagf( "L%d: multiple default branches in match statement.\n", p->current.line);
                 p->hadError = true;
             }
             reaAdvance(p);
             if (p->current.type != REA_TOKEN_ARROW) {
-                fprintf(stderr, "L%d: expected '->' after default label.\n", p->current.line);
+                reaDiagf( "L%d: expected '->' after default label.\n", p->current.line);
                 p->hadError = true;
             } else {
                 reaAdvance(p);
@@ -3444,12 +3589,12 @@ static AST *parseMatch(ReaParser *p) {
             continue;
         }
         // Skip unexpected tokens to avoid infinite loop.
-        fprintf(stderr, "L%d: unexpected token in match body.\n", p->current.line);
+        reaDiagf( "L%d: unexpected token in match body.\n", p->current.line);
         p->hadError = true;
         reaAdvance(p);
     }
     if (p->current.type != REA_TOKEN_RIGHT_BRACE) {
-        fprintf(stderr, "L%d: expected '}' to close match statement.\n", p->current.line);
+        reaDiagf( "L%d: expected '}' to close match statement.\n", p->current.line);
         p->hadError = true;
     } else {
         reaAdvance(p);
@@ -3478,19 +3623,19 @@ static AST *parseThrow(ReaParser *p) {
 static AST *parseTry(ReaParser *p) {
     reaAdvance(p); // consume 'try'
     if (p->current.type != REA_TOKEN_LEFT_BRACE) {
-        fprintf(stderr, "L%d: expected '{' after try keyword.\n", p->current.line);
+        reaDiagf( "L%d: expected '{' after try keyword.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
     AST *tryBlock = parseBlock(p);
     if (p->current.type != REA_TOKEN_CATCH) {
-        fprintf(stderr, "L%d: expected catch clause for try block.\n", p->current.line);
+        reaDiagf( "L%d: expected catch clause for try block.\n", p->current.line);
         p->hadError = true;
         return tryBlock;
     }
     reaAdvance(p); // consume 'catch'
     if (p->current.type != REA_TOKEN_LEFT_PAREN) {
-        fprintf(stderr, "L%d: expected '(' after catch.\n", p->current.line);
+        reaDiagf( "L%d: expected '(' after catch.\n", p->current.line);
         p->hadError = true;
         return tryBlock;
     }
@@ -3503,13 +3648,13 @@ static AST *parseTry(ReaParser *p) {
         setTypeAST(typeNode, TYPE_INT64);
     }
     if (!tokenIsIdentifierLike(p->current.type)) {
-        fprintf(stderr, "L%d: expected identifier for catch variable.\n", p->current.line);
+        reaDiagf( "L%d: expected identifier for catch variable.\n", p->current.line);
         p->hadError = true;
         return tryBlock;
     }
     char *lex = (char *)malloc(p->current.length + 1);
     if (!lex) {
-        fprintf(stderr, "Memory allocation failure parsing catch variable.\n");
+        reaDiagf( "Memory allocation failure parsing catch variable.\n");
         EXIT_FAILURE_HANDLER();
     }
     memcpy(lex, p->current.start, p->current.length);
@@ -3518,7 +3663,7 @@ static AST *parseTry(ReaParser *p) {
     free(lex);
     reaAdvance(p);
     if (p->current.type != REA_TOKEN_RIGHT_PAREN) {
-        fprintf(stderr, "L%d: expected ')' after catch binding.\n", p->current.line);
+        reaDiagf( "L%d: expected ')' after catch binding.\n", p->current.line);
         p->hadError = true;
     } else {
         reaAdvance(p);
@@ -3572,7 +3717,7 @@ static AST *parseConstDecl(ReaParser *p) {
     // declared type to TYPE_ARRAY, e.g. `const int xs[3] = [1,2,3];`.
     if (p->current.type == REA_TOKEN_LEFT_BRACKET) {
         if (!typeNode) {
-            fprintf(stderr, "L%d: Array constant requires an element type.\n", p->current.line);
+            reaDiagf( "L%d: Array constant requires an element type.\n", p->current.line);
             p->hadError = true;
             return NULL;
         }
@@ -3611,7 +3756,7 @@ static AST *parseTypeAlias(ReaParser *p) {
     reaAdvance(p); // consume 'type'
 
     if (p->current.type != REA_TOKEN_ALIAS) {
-        fprintf(stderr, "L%d: Expected 'alias' after 'type'.\n", line);
+        reaDiagf( "L%d: Expected 'alias' after 'type'.\n", line);
         p->hadError = true;
         return NULL;
     }
@@ -3622,9 +3767,9 @@ static AST *parseTypeAlias(ReaParser *p) {
         const char *lex = p->current.start;
         int len = (int)p->current.length;
         if (!lex || len <= 0) {
-            fprintf(stderr, "L%d: type name is reserved.\n", line);
+            reaDiagf( "L%d: type name is reserved.\n", line);
         } else {
-            fprintf(stderr, "L%d: type name '%.*s' is reserved.\n", line, len, lex);
+            reaDiagf( "L%d: type name '%.*s' is reserved.\n", line, len, lex);
         }
         p->hadError = true;
         return NULL;
@@ -3632,7 +3777,7 @@ static AST *parseTypeAlias(ReaParser *p) {
 
     char *aliasName = (char *)malloc(p->current.length + 1);
     if (!aliasName) {
-        fprintf(stderr, "Memory allocation failure while parsing type alias name.\n");
+        reaDiagf( "Memory allocation failure while parsing type alias name.\n");
         p->hadError = true;
         return NULL;
     }
@@ -3646,15 +3791,15 @@ static AST *parseTypeAlias(ReaParser *p) {
     bool framePushed = false;
 
     if (typeNameAlreadyDefined(aliasTok->value)) {
-        fprintf(stderr, "L%d: type alias '%s' already defined.\n", aliasTok->line, aliasTok->value);
+        reaDiagf( "L%d: type alias '%s' already defined.\n", aliasTok->line, aliasTok->value);
         p->hadError = true;
     } else {
         AST *existing = lookupType(aliasTok->value);
         if (existing) {
             if (!existing->token) {
-                fprintf(stderr, "L%d: type name '%s' is reserved.\n", aliasTok->line, aliasTok->value);
+                reaDiagf( "L%d: type name '%s' is reserved.\n", aliasTok->line, aliasTok->value);
             } else {
-                fprintf(stderr, "L%d: type alias '%s' already defined.\n", aliasTok->line, aliasTok->value);
+                reaDiagf( "L%d: type alias '%s' already defined.\n", aliasTok->line, aliasTok->value);
             }
             p->hadError = true;
             if (!existing->token) {
@@ -3675,7 +3820,7 @@ static AST *parseTypeAlias(ReaParser *p) {
     }
 
     if (p->current.type != REA_TOKEN_EQUAL) {
-        fprintf(stderr, "L%d: Expected '=' in type alias declaration.\n", p->current.line);
+        reaDiagf( "L%d: Expected '=' in type alias declaration.\n", p->current.line);
         p->hadError = true;
         if (framePushed) {
             popGenericFrame(p);
@@ -3688,7 +3833,7 @@ static AST *parseTypeAlias(ReaParser *p) {
     AST *aliasType = parsePointerParamType(p);
     if (!aliasType) {
         if (!p->hadError) {
-            fprintf(stderr, "L%d: Expected type after '=' in type alias.\n", p->current.line);
+            reaDiagf( "L%d: Expected type after '=' in type alias.\n", p->current.line);
             p->hadError = true;
         }
         if (framePushed) {
@@ -3763,7 +3908,7 @@ static AST *parseImport(ReaParser *p) {
         if (tokenIsKeyword(&p->current, "as")) {
             reaAdvance(p); // consume 'as'
             if (!tokenIsIdentifierLike(p->current.type)) {
-                fprintf(stderr, "L%d: Expected alias identifier after 'as'.\n", p->current.line);
+                reaDiagf( "L%d: Expected alias identifier after 'as'.\n", p->current.line);
                 p->hadError = true;
             } else {
                 alias = (char*)malloc(p->current.length + 1);
@@ -3806,7 +3951,7 @@ static AST *parseImport(ReaParser *p) {
     }
 
     if (!parsed_any) {
-        fprintf(stderr, "L%d: Malformed #import directive.\n", p->current.line);
+        reaDiagf( "L%d: Malformed #import directive.\n", p->current.line);
         p->hadError = true;
     }
 
@@ -3871,7 +4016,7 @@ static AST *parseModule(ReaParser *p) {
     reaAdvance(p); // consume 'module'
 
     if (!tokenIsIdentifierLike(p->current.type)) {
-        fprintf(stderr, "L%d: Expected module name after 'module'.\n", p->current.line);
+        reaDiagf( "L%d: Expected module name after 'module'.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
@@ -3885,7 +4030,7 @@ static AST *parseModule(ReaParser *p) {
     reaAdvance(p); // consume module name
 
     if (p->current.type != REA_TOKEN_LEFT_BRACE) {
-        fprintf(stderr, "L%d: Expected '{' to begin module body.\n", p->current.line);
+        reaDiagf( "L%d: Expected '{' to begin module body.\n", p->current.line);
         p->hadError = true;
         return NULL;
     }
@@ -3926,7 +4071,7 @@ static AST *parseModule(ReaParser *p) {
     if (p->current.type == REA_TOKEN_RIGHT_BRACE) {
         reaAdvance(p);
     } else {
-        fprintf(stderr, "L%d: Expected '}' to close module body.\n", p->current.line);
+        reaDiagf( "L%d: Expected '}' to close module body.\n", p->current.line);
         p->hadError = true;
     }
 
@@ -3945,7 +4090,7 @@ static AST *parseStatement(ReaParser *p) {
         int line = p->current.line;
         reaAdvance(p); // consume 'export'
         if (!p->inModule) {
-            fprintf(stderr, "L%d: 'export' is only valid inside a module.\n", line);
+            reaDiagf( "L%d: 'export' is only valid inside a module.\n", line);
             p->hadError = true;
         }
         bool prevMark = p->markExport;
@@ -4205,6 +4350,7 @@ AST *parseRea(const char *source) {
     p.genericFrameStack = NULL;
     p.genericFrameDepth = 0;
     p.genericFrameCapacity = 0;
+    g_reaParseDiagCount = 0; /* count only THIS parse's diagnostics (silent-failure backstop) */
     reaAdvance(&p);
 
     AST *program = newASTNode(AST_PROGRAM, NULL);
@@ -4228,13 +4374,13 @@ AST *parseRea(const char *source) {
                 const char *path = reaSemanticGetSourcePath();
                 const char *code = reaFrontendInferDiagnosticCode("parser", "Unexpected token");
                 if (path && *path) {
-                    fprintf(stderr, "%s:%d: ", path, p.current.line);
+                    reaDiagf( "%s:%d: ", path, p.current.line);
                 }
                 if (code) {
-                    fprintf(stderr, "[%s] ", code);
+                    reaDiagf( "[%s] ", code);
                 }
             }
-            fprintf(stderr,
+            reaDiagf(
                     "Unexpected token %s '%.*s' at line %d\n",
                     reaTokenTypeToString(p.current.type),
                     (int)p.current.length,
@@ -4441,7 +4587,7 @@ AST *parseRea(const char *source) {
             AST* s = stmts->children[i];
             if (strictScanTop(s)) {
                 int l = s && s->token ? s->token->line : 0;
-                fprintf(stderr, "L%d: Strict mode error: disallowed construct at top level (e.g., 'myself' or 'return').\n", l);
+                reaDiagf( "L%d: Strict mode error: disallowed construct at top level (e.g., 'myself' or 'return').\n", l);
                 p.hadError = true;
                 break;
             }
@@ -4449,6 +4595,25 @@ AST *parseRea(const char *source) {
     }
 
     clearGenericState(&p);
+
+    /* Silent-failure backstop: a parse failure that set p.hadError but reported
+     * nothing (a NULL propagated up a chain that only set the flag) used to exit
+     * with empty stderr -- the worst case for humans and LLM repair loops
+     * (nothing to react to). Emit one clear error anchored at wherever parsing
+     * stalled so a failure is never silent. Mirrors aether ast_parser.c. */
+    if (p.hadError && g_reaParseDiagCount == 0) {
+        if (p.current.type == REA_TOKEN_EOF) {
+            reaDiagf("L%d: syntax error: unexpected end of input; "
+                     "a declaration or statement is incomplete.\n",
+                     p.current.line > 0 ? p.current.line : 1);
+        } else {
+            reaDiagf("L%d: syntax error: unexpected token '%.*s'; "
+                     "this construct could not be parsed.\n",
+                     p.current.line > 0 ? p.current.line : 1,
+                     p.current.start ? (int)p.current.length : 1,
+                     p.current.start ? p.current.start : "?");
+        }
+    }
 
     if (p.hadError) {
         freeAST(program);

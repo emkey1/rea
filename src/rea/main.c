@@ -487,6 +487,33 @@ static ParsedDiagnostic *collectDiagnosticsFromText(const char *text, int *outCo
                 free(items[count - 1].hint);
                 items[count - 1].hint = diagDupRange(line + 6, line + strlen(line));
                 free(line);
+            } else if (line && strncmp(line, "help: ", 6) == 0) {
+                /* The standalone `help: see <CODE> ...` guide-pointer line that
+                 * follows every coded diagnostic (aetherReportGuideHelp) belongs
+                 * to the PRECEDING diagnostic; fold it in like a hint: line
+                 * (appended after any existing hint) instead of emitting a junk
+                 * entry (code null, kind generic). With no preceding entry the
+                 * stray pointer has nothing to attach to, so it is skipped. */
+                if (count > 0) {
+                    const char *text = line + 6;
+                    ParsedDiagnostic *prev = &items[count - 1];
+                    if (!prev->hint) {
+                        prev->hint = diagDupRange(text, text + strlen(text));
+                    } else {
+                        size_t hintLen = strlen(prev->hint);
+                        size_t textLen = strlen(text);
+                        char *merged = (char *)malloc(hintLen + 2 + textLen + 1);
+                        if (merged) {
+                            memcpy(merged, prev->hint, hintLen);
+                            merged[hintLen] = ';';
+                            merged[hintLen + 1] = ' ';
+                            memcpy(merged + hintLen + 2, text, textLen + 1);
+                            free(prev->hint);
+                            prev->hint = merged;
+                        }
+                    }
+                }
+                free(line);
             } else if (line) {
                 if (count == capacity) {
                     int newCap = capacity ? capacity * 2 : 8;

@@ -12,11 +12,11 @@ frontend could reuse.
 
 ## Already shared (Rea benefits today or nearly for free)
 
-- **Constant record-field defaults.**  `emitDefaultFieldInitializers` landed in
-  pscal-core's compiler (2026-07-01-4, FIELD-003 work), applied on top of the
-  type zero at `new`.  The backend half is done; Rea only needs the surface
-  syntax (`x: int = 0;` in a class body) wired to the same field-default
-  attachment on `AST_VAR_DECL`.
+- **Constant record-field defaults — DONE (2026-07-01).**  Rea class bodies
+  accept `int count = 0;` style constant defaults, applied at `new` on top of
+  the type zero, with the same FIELD-003 constant boundary as Aether
+  (non-constant defaults rejected at parse time; constructor and
+  `new T { field: v }` overrides win).  Backend was already in pscal-core.
 - **Single-source effectfulness registry.**  `pscalBuiltinNameIsEffectful()`
   (pscal-core builtin.c) classifies every builtin.  Rea could offer an opt-in
   purity annotation checked against the same registry with zero new
@@ -34,10 +34,10 @@ frontend could reuse.
   LLM-repair-loop ergonomics.  The Aether lesson worth porting *properly*:
   pass explicit codes at emission sites; substring inference on message text
   is fragile.
-- **Silent-failure backstop.**  Aether funnels every parser diagnostic through
-  one counting sink and emits a guaranteed coded error if a parse fails with
-  zero messages (`ast_parser.c` 2026-07-01-1).  Rea's parser has the same
-  latent risk class; the pattern is small and mechanical.
+- **Silent-failure backstop — DONE (2026-07-01).**  Rea's parser now funnels
+  all diagnostics through a counting sink (`reaDiagf`) and emits a guaranteed
+  fallback syntax error at the stalled token when a parse fails with zero
+  messages, mirroring aether's pattern.
 - **Contract annotations.**  Aether's `@pre`/`@post` lower to plain AST guard
   code (`if (!(e)) { writeln(...); halt(1); }`) — no backend support needed.
   Rea could adopt the same annotations on methods/functions almost verbatim;
@@ -93,9 +93,6 @@ frontend could reuse.
 - Feasibility caveat (owner's note): Rea carries existing design history and
   an installed base of engine behavior; evolve additively (new opt-in surface,
   shared-engine facilities) rather than re-founding it.
-- Diagnostics-JSON collector (src/rea/main.c): the standalone `help: see
-  CODE ...` guide-pointer line that follows a coded diagnostic is captured as
-  its own junk entry (severity error, kind generic, code null). Folding it
-  into the preceding diagnostic (like the existing `hint:` handling) would
-  keep the machine-readable stream one-entry-per-problem; observed while
-  wiring Aether's TYPE-001/TOON-001 semantic codes.
+- Diagnostics-JSON collector help:-line junk entry — FIXED (2026-07-01):
+  `help:` lines now fold into the preceding diagnostic's hint like `hint:`
+  lines, so a coded diagnostic is one JSON entry.

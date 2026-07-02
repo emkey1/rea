@@ -1,0 +1,63 @@
+// Constant class-field defaults: applied at `new` for unset fields
+// (pscal-core emitDefaultFieldInitializers), overridden by constructors,
+// assignments and `new T { field: value }` initializers. Fields without a
+// default keep their type-zero fallback.
+class Helper {
+  int z;
+}
+
+class Defaults {
+  int count = 7;
+  double rate = 1.5;
+  double widened = 3;      // int constant widens into a real field
+  str name = "hi";
+  bool on = true;
+  int neg = -4;            // constant unary expression
+  int sum = 2 + 3 * 4;     // constant binary expression
+  Helper buddy = nil;      // nil for a class-typed (pointer) field
+  int plain;               // no default: type-zero fallback
+  str emptyText;           // no default: type-zero fallback
+}
+
+class Base {
+  int a = 1;
+  str tag = "base";
+}
+
+class Derived extends Base {
+  int b = 2;               // parent defaults apply through inheritance
+}
+
+class Ctor {
+  int x = 5;
+  Ctor(int v) { my.x = v; }
+}
+
+Defaults d = new Defaults();
+writeln(d.count);
+writeln(d.rate);
+writeln(d.widened);
+writeln(d.name);
+writeln(d.on);
+writeln(d.neg);
+writeln(d.sum);
+writeln(d.buddy == nil);
+writeln(d.plain);
+writeln(d.emptyText == "");
+
+Derived dv = new Derived();
+writeln(dv.a);
+writeln(dv.tag);
+writeln(dv.b);
+
+Ctor c = new Ctor(9);     // constructor assignment overrides the default
+writeln(c.x);
+Ctor c2 = new Ctor(5);
+writeln(c2.x);
+
+Base lit = new Base { a: 42 };  // record-literal initializer overrides; tag keeps default
+writeln(lit.a);
+writeln(lit.tag);
+
+d.count = 100;            // plain assignment overrides after construction
+writeln(d.count);

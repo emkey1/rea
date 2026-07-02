@@ -525,6 +525,61 @@ PY
     return 1
 }
 
+# Class-field defaults must be compile-time constants (parity with aether's
+# FIELD-003 boundary): a default that calls a function, reads another field or
+# `myself`, or type-mismatches the field must be rejected at parse time with a
+# clear diagnostic and a nonzero exit. Bespoke (not a fixture) because
+# run_rea_fixture treats any nonzero exit as a failure.
+rea_field_default_rejects_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    cat > "$src_dir/NonConst.rea" <<'EOF'
+int g() { return 42; }
+class A { int x = g(); }
+A a = new A();
+EOF
+    cat > "$src_dir/FieldRef.rea" <<'EOF'
+class B {
+  int x = 5;
+  int y = myself.x;
+}
+B b = new B();
+EOF
+    cat > "$src_dir/Mismatch.rea" <<'EOF'
+class C { int x = "oops"; }
+C c = new C();
+EOF
+
+    local name expect
+    for name in NonConst FieldRef Mismatch; do
+        case "$name" in
+            Mismatch) expect="field default type mismatch" ;;
+            *) expect="class field defaults must be compile-time constants" ;;
+        esac
+        set +e
+        (cd "$src_dir" && "$REA_BIN" --no-cache "$name.rea" > "$src_dir/$name.out" 2> "$src_dir/$name.err")
+        local status=$?
+        set -e
+        if [ $status -eq 0 ]; then
+            issues+=("$name: expected nonzero exit for invalid field default")
+        fi
+        if ! grep -q "$expect" "$src_dir/$name.err"; then
+            issues+=("$name: missing diagnostic '$expect'; stderr was: $(cat "$src_dir/$name.err")")
+        fi
+    done
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -675,6 +730,12 @@ if details=$(rea_hangman_example); then
     harness_report PASS "rea_hangman_example" "Hangman example emits vtable before constructor"
 else
     harness_report FAIL "rea_hangman_example" "Hangman example emits vtable before constructor" "$details"
+fi
+
+if details=$(rea_field_default_rejects_test); then
+    harness_report PASS "rea_field_default_rejects" "Non-constant/mismatched class field defaults are rejected"
+else
+    harness_report FAIL "rea_field_default_rejects" "Non-constant/mismatched class field defaults are rejected" "$details"
 fi
 
 if details=$(rea_cache_reuse_test); then
