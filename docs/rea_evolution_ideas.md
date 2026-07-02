@@ -74,12 +74,28 @@ frontend could reuse.
 
 - Rea already has the OOP/class model Aether deliberately excludes; the
   complementary positioning is: Aether = narrow, one-spelling, no-guide
-  generation; Rea = fuller language where closures/HOFs, richer stdlib, and
-  general-purpose ergonomics could live without violating Aether's design
-  rules.
+  generation; Rea = the fuller general-purpose sibling (richer stdlib,
+  general-purpose ergonomics) without violating Aether's design rules.
+- **Closures: decided against for now (owner, 2026-07-01).**  Rea is a
+  traditional OOP language, and objects already cover the closure use cases
+  (captured state = fields, behavior = a method); real capturing closures
+  would add a second competing idiom, a new VM value kind, capture-semantics
+  choices, captured-frame lifetimes, and would hide effects from any future
+  purity/effect checks.  If a Rea benchmark ever shows HOF-shaped failures
+  dominating, the measured middle step is **named function/bound-method
+  references** (no environment capture): callbacks and `map(xs, double)`
+  shapes, statically checkable, composing with OOP instead of competing with
+  it.  Capturing closures stay off the roadmap unless the instrument demands
+  them.
 - The Aether benchmark harness (doc-variant scoring, repair loop, generative
   idea-mining) is language-agnostic in structure; pointing it at Rea would
   give the same empirical design instrument before investing in new features.
 - Feasibility caveat (owner's note): Rea carries existing design history and
   an installed base of engine behavior; evolve additively (new opt-in surface,
   shared-engine facilities) rather than re-founding it.
+- Diagnostics-JSON collector (src/rea/main.c): the standalone `help: see
+  CODE ...` guide-pointer line that follows a coded diagnostic is captured as
+  its own junk entry (severity error, kind generic, code null). Folding it
+  into the preceding diagnostic (like the existing `hint:` handling) would
+  keep the machine-readable stream one-entry-per-problem; observed while
+  wiring Aether's TYPE-001/TOON-001 semantic codes.
