@@ -373,9 +373,7 @@ run_rea_fixture() {
         python3 "$RUNNER_PY" --timeout "$TEST_TIMEOUT" "$REA_BIN" --dump-bytecode-only "$src_rel" > /dev/null 2> "$disasm_stderr"
         local disasm_status=$?
         set -e
-        strip_ansi_inplace "$disasm_stderr"
-        perl -0 -pe 's/^Compilation successful.*\n//m; s/^Loaded cached bytecode.*\n//m' "$disasm_stderr" > "$disasm_stderr.clean"
-        mv "$disasm_stderr.clean" "$disasm_stderr"
+        normalise_rea_stderr "$disasm_stderr"
         if [ $disasm_status -ne 0 ]; then
             status="FAIL"
             details+=("Disassembly exited with status $disasm_status")

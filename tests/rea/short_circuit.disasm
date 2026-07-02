@@ -147,5 +147,5 @@ Constants (41):\n  0000: STR   "myself"
   0037: STR   "B hit"
   0038: STR   "B skip"
   0039: STR   "vals:"
-  0040: CHAR  ' '
+  0040: STR   " "
 
