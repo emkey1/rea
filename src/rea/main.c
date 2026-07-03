@@ -310,12 +310,12 @@ static void inferDiagnosticPhaseKind(const char *message, char **outPhase, char 
     const char *kind = "generic";
 
     if (message) {
-        if (strstr(message, "rewrite error")) {
-            phase = "rewrite";
+        if (strstr(message, "parser error")) {
+            phase = "parser";
             if (strstr(message, "declaration")) kind = "declaration";
             else if (strstr(message, "TOON")) kind = "toon";
             else if (strstr(message, "par")) kind = "par";
-            else kind = "rewrite";
+            else kind = "parser";
         } else if (strstr(message, "Aether contract error")) {
             phase = "semantic";
             kind = "contract";
