@@ -1153,6 +1153,25 @@ static AST *findGlobalFunctionDecl(const char *name) {
             child->token && child->token->value && strcasecmp(child->token->value, name) == 0) {
             return child;
         }
+        /* A module's own body is merged into the outer program's AST as an
+         * AST_MODULE wrapper, not flattened into these top-level decls, so a
+         * plain sibling-to-sibling call within the SAME module (e.g. one
+         * function calling another declared later in the same `module { }`
+         * block) is otherwise invisible to this scan. That leaves callDecl
+         * NULL and falls through to the bare-name procedure_table lookup,
+         * which only knows the module-qualified name ("Module.func") and
+         * reports a false "identifier not in scope". */
+        if (child->type == AST_MODULE) {
+            AST *moduleDecls = getDeclsCompound(child);
+            if (!moduleDecls) continue;
+            for (int j = 0; j < moduleDecls->child_count; j++) {
+                AST *mchild = moduleDecls->children[j];
+                if (mchild && (mchild->type == AST_FUNCTION_DECL || mchild->type == AST_PROCEDURE_DECL) &&
+                    mchild->token && mchild->token->value && strcasecmp(mchild->token->value, name) == 0) {
+                    return mchild;
+                }
+            }
+        }
     }
     return NULL;
 }

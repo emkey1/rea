@@ -3084,6 +3084,22 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
         if (!has_body) {
             sym->is_defined = false;
         }
+        /* Compute arity from the just-parsed parameter list now, rather than
+         * leaving it at the calloc'd 0 until this function's own body is
+         * compiled. Without this, a call site compiled earlier (e.g. an
+         * earlier top-level function calling one declared later) reads a
+         * stale arity of 0 off this stub and reports a bogus arity-mismatch
+         * error before the real definition is ever reached. */
+        int computed_arity = 0;
+        for (int i = 0; i < func->child_count; i++) {
+            AST *paramGroup = func->children[i];
+            if (!paramGroup || paramGroup->type != AST_VAR_DECL) continue;
+            int groupCount = paramGroup->child_count > 0 ? paramGroup->child_count : 1;
+            computed_arity += groupCount;
+        }
+        if (computed_arity > 255) computed_arity = 255;
+        if (computed_arity < 0) computed_arity = 0;
+        sym->arity = (uint8_t)computed_arity;
     }
 
     // If inside a class, also add a bare-name alias so 'obj.method(...)' can resolve.
