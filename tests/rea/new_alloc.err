@@ -18,8 +18,8 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0027    | GET_FIELD_OFFSET    2 (index)
 0029    | CONSTANT            7 'Value type INT64'
 0031    | SET_INDIRECT
-0032    | SET_GLOBAL          3 'p' cache=0x0
-0042    0 HALT
+0032    | SET_GLOBAL          3 'p' cache_id=0
+0036    0 HALT
 == End Disassembly: rea/new_alloc.rea ==
 
 Constants (8):\n  0000: STR   "myself"

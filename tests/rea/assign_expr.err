@@ -11,8 +11,8 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0020    | GET_GLOBAL_ADDRESS    3 'b'
 0022    | SWAP
 0023    | SET_INDIRECT
-0024    | SET_GLOBAL          5 'a' cache=0x0
-0034    0 HALT
+0024    | SET_GLOBAL          5 'a' cache_id=0
+0028    0 HALT
 == End Disassembly: rea/assign_expr.rea ==
 
 Constants (8):\n  0000: STR   "myself"

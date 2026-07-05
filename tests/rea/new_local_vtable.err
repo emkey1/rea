@@ -4,31 +4,31 @@ Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
 0002    | DEFINE_GLOBAL    NameIdx:0   'myself' Type:POINTER ('')
-0007    1 JUMP                1 (to 0011)
+0007    1 JUMP                1 (to 0013)
 
---- Procedure mixedcase.hi (at 0010) ---
-0010    | RETURN
-0011    2 JUMP               23 (to 0037)
+--- Procedure mixedcase.hi (at 0012) ---
+0012    | RETURN
+0013    2 JUMP               23 (to 0041)
 
---- Procedure run (at 0014) ---
-0014    3 RESET_LOCAL         1 (slot)
-0016    | INIT_LOCAL_POINTER    1 (slot)    3 'MixedCase'
-0020    | ALLOC_OBJECT        2 (fields)
-0022    | DUP
-0023    | GET_FIELD_OFFSET    0 (index)
-0025    | GET_GLOBAL_ADDRESS    4 'mixedcase_vtable'
-0027    | SET_INDIRECT
-0028    | DUP
-0029    | GET_FIELD_OFFSET    1 (index)
-0031    | CONSTANT            5 'Value type POINTER'
-0033    | SET_INDIRECT
-0034    | SET_LOCAL           1 (slot)
-0036    2 RETURN
-0037    0 CONSTANT            6 'Value type ARRAY'
-0039    | DEFINE_GLOBAL    NameIdx:4   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
-0050    | SET_GLOBAL          4 'mixedcase_vtable' cache=0x0
-0060    5 CALL_USER_PROC       9 'run' @0014 (0 args)
-0064    0 HALT
+--- Procedure run (at 0018) ---
+0018    3 RESET_LOCAL         1 (slot)
+0020    | INIT_LOCAL_POINTER    1 (slot)    3 'MixedCase'
+0024    | ALLOC_OBJECT        2 (fields)
+0026    | DUP
+0027    | GET_FIELD_OFFSET    0 (index)
+0029    | GET_GLOBAL_ADDRESS    4 'mixedcase_vtable'
+0031    | SET_INDIRECT
+0032    | DUP
+0033    | GET_FIELD_OFFSET    1 (index)
+0035    | CONSTANT            5 'Value type POINTER'
+0037    | SET_INDIRECT
+0038    | SET_LOCAL           1 (slot)
+0040    2 RETURN
+0041    0 CONSTANT            6 'Value type ARRAY'
+0043    | DEFINE_GLOBAL    NameIdx:4   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
+0054    | SET_GLOBAL          4 'mixedcase_vtable' cache_id=0
+0058    5 CALL_USER_PROC       9 'run' @0018 (0 args)
+0062    0 HALT
 == End Disassembly: rea/new_local_vtable.rea ==
 
 Constants (10):\n  0000: STR   "myself"

@@ -10,11 +10,11 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0015    | GET_FIELD_OFFSET    0 (index)
 0017    | CONSTANT            5 'Value type POINTER'
 0019    | SET_INDIRECT
-0020    | SET_GLOBAL          3 'd' cache=0x0
-0030    3 CONST_1
-0031    | CONST_1
-0032    | CALL_BUILTIN_PROC   181 'write' (2 args)
-0038    0 HALT
+0020    | SET_GLOBAL          3 'd' cache_id=0
+0024    3 CONST_1
+0025    | CONST_1
+0026    | CALL_BUILTIN_PROC   181 'write' (2 args)
+0032    0 HALT
 == End Disassembly: rea/class_instantiation.rea ==
 
 Constants (8):\n  0000: STR   "myself"

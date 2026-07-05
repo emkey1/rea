@@ -10,23 +10,23 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0015    | PUSH_IMM_I8         3
 0017    | MULTIPLY
 0018    | ADD
-0019    | SET_GLOBAL          3 'a' cache=0x0
-0029    2 DEFINE_GLOBAL    NameIdx:8   'b' Type:BOOLEAN ('__pscal_anon_type_2')
-0034    | GET_GLOBAL          3 'a' cache=0x0
-0044    | PUSH_IMM_I8         7
-0046    | GREATER_EQUAL
-0047    | SET_GLOBAL          8 'b' cache=0x0
-0057    3 DEFINE_GLOBAL    NameIdx:11  'msg' Type:UNICODESTRING ('__pscal_anon_type_3')
-0062    | CONSTANT           13 'hi'
-0064    | SET_GLOBAL         11 'msg' cache=0x0
-0074    4 GET_GLOBAL          3 'a' cache=0x0
-0084    | NEGATE
-0085    | PUSH_IMM_I8         4
-0087    | ADD
-0088    | GET_GLOBAL_ADDRESS    3 'a'
-0090    | SWAP
-0091    | SET_INDIRECT
-0092    0 HALT
+0019    | SET_GLOBAL          3 'a' cache_id=0
+0023    2 DEFINE_GLOBAL    NameIdx:8   'b' Type:BOOLEAN ('__pscal_anon_type_2')
+0028    | GET_GLOBAL          3 'a' cache_id=1
+0032    | PUSH_IMM_I8         7
+0034    | GREATER_EQUAL
+0035    | SET_GLOBAL          8 'b' cache_id=2
+0039    3 DEFINE_GLOBAL    NameIdx:11  'msg' Type:UNICODESTRING ('__pscal_anon_type_3')
+0044    | CONSTANT           13 'hi'
+0046    | SET_GLOBAL         11 'msg' cache_id=3
+0050    4 GET_GLOBAL          3 'a' cache_id=4
+0054    | NEGATE
+0055    | PUSH_IMM_I8         4
+0057    | ADD
+0058    | GET_GLOBAL_ADDRESS    3 'a'
+0060    | SWAP
+0061    | SET_INDIRECT
+0062    0 HALT
 == End Disassembly: rea/bytecode_exec.rea ==
 
 Constants (15):\n  0000: STR   "myself"

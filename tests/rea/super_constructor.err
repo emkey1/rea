@@ -4,45 +4,45 @@ Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
 0002    | DEFINE_GLOBAL    NameIdx:0   'myself' Type:POINTER ('')
-0007    1 JUMP                9 (to 0019)
+0007    1 JUMP                9 (to 0021)
 
---- Procedure base.base (at 0010) ---
-0010    | GET_LOCAL           1 (slot)
-0012    | GET_LOCAL           0 (slot)
-0014    | GET_FIELD_OFFSET    1 (index)
-0016    | SWAP
-0017    | SET_INDIRECT
-0018    | RETURN
-0019    2 JUMP                9 (to 0031)
+--- Procedure base.base (at 0012) ---
+0012    | GET_LOCAL           1 (slot)
+0014    | GET_LOCAL           0 (slot)
+0016    | GET_FIELD_OFFSET    1 (index)
+0018    | SWAP
+0019    | SET_INDIRECT
+0020    | RETURN
+0021    2 JUMP                9 (to 0035)
 
---- Procedure child.child (at 0022) ---
-0022    | GET_LOCAL           0 (slot)
-0024    | GET_LOCAL           1 (slot)
-0026    | CALL_USER_PROC       3 'base.base' @0010 (2 args)
-0030    | RETURN
-0031    3 DEFINE_GLOBAL    NameIdx:4   'c' Type:POINTER ('Child')
-0036    | ALLOC_OBJECT        3 (fields)
-0038    | DUP
-0039    | GET_FIELD_OFFSET    0 (index)
-0041    | CONSTANT            6 'Value type POINTER'
-0043    | SET_INDIRECT
-0044    | DUP
-0045    | GET_FIELD_OFFSET    1 (index)
-0047    | CONSTANT            7 'Value type INT64'
-0049    | SET_INDIRECT
-0050    | DUP
-0051    | GET_FIELD_OFFSET    0 (index)
-0053    | CONSTANT            8 'Value type POINTER'
-0055    | SET_INDIRECT
-0056    | DUP
-0057    | PUSH_IMM_I8        42
-0059    | CALL_USER_PROC      10 'child.child' @0022 (2 args)
-0063    | SET_GLOBAL          4 'c' cache=0x0
-0073    4 CONST_1
-0074    | GET_GLOBAL          4 'c' cache=0x0
-0084    | LOAD_FIELD_VALUE    1 (index)
-0086    | CALL_BUILTIN_PROC   181 'write' (2 args)
-0092    0 HALT
+--- Procedure child.child (at 0026) ---
+0026    | GET_LOCAL           0 (slot)
+0028    | GET_LOCAL           1 (slot)
+0030    | CALL_USER_PROC       3 'base.base' @0012 (2 args)
+0034    | RETURN
+0035    3 DEFINE_GLOBAL    NameIdx:4   'c' Type:POINTER ('Child')
+0040    | ALLOC_OBJECT        3 (fields)
+0042    | DUP
+0043    | GET_FIELD_OFFSET    0 (index)
+0045    | CONSTANT            6 'Value type POINTER'
+0047    | SET_INDIRECT
+0048    | DUP
+0049    | GET_FIELD_OFFSET    1 (index)
+0051    | CONSTANT            7 'Value type INT64'
+0053    | SET_INDIRECT
+0054    | DUP
+0055    | GET_FIELD_OFFSET    0 (index)
+0057    | CONSTANT            8 'Value type POINTER'
+0059    | SET_INDIRECT
+0060    | DUP
+0061    | PUSH_IMM_I8        42
+0063    | CALL_USER_PROC      10 'child.child' @0026 (2 args)
+0067    | SET_GLOBAL          4 'c' cache_id=0
+0071    4 CONST_1
+0072    | GET_GLOBAL          4 'c' cache_id=1
+0076    | LOAD_FIELD_VALUE    1 (index)
+0078    | CALL_BUILTIN_PROC   181 'write' (2 args)
+0084    0 HALT
 == End Disassembly: rea/super_constructor.rea ==
 
 Constants (13):\n  0000: STR   "myself"
