@@ -33,6 +33,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "vm/vm.h"
+#include "vm/vm_fx_policy.h"
 #include "core/cache.h"
 #include "core/utils.h"
 #include "core/preproc.h"
@@ -913,6 +914,12 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             diagnostics_toon = 1;
         } else if (strncmp(argv[argi], "--vm-trace-head=", 16) == 0) {
             vm_trace_head = atoi(argv[argi] + 16);
+        } else if (pscalFxIsCliFlag(argv[argi])) {
+            const char *fx_value = (argi + 1 < argc) ? argv[argi + 1] : NULL;
+            if (!pscalFxHandleCliFlag(argv[argi], fx_value)) {
+                REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
+            }
+            argi++;
         } else {
             fprintf(stderr, "Unknown option: %s\n%s", argv[argi], REA_USAGE);
             REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
