@@ -3,32 +3,32 @@
 Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
-0002    | DEFINE_GLOBAL    NameIdx:0   'myself' Type:POINTER ('')
-0007    1 JUMP                1 (to 0013)
+0002    | DEFINE_GLOBAL_SLOT Slot:0   'myself' Type:POINTER ('')
+0008    1 JUMP                1 (to 0014)
 
---- Procedure mixedcase.hi (at 0012) ---
-0012    | RETURN
-0013    2 JUMP               23 (to 0041)
+--- Procedure mixedcase.hi (at 0013) ---
+0013    | RETURN
+0014    2 JUMP               24 (to 0043)
 
---- Procedure run (at 0018) ---
-0018    3 RESET_LOCAL         1 (slot)
-0020    | INIT_LOCAL_POINTER    1 (slot)    3 'MixedCase'
-0024    | ALLOC_OBJECT        2 (fields)
-0026    | DUP
-0027    | GET_FIELD_OFFSET    0 (index)
-0029    | GET_GLOBAL_ADDRESS    4 'mixedcase_vtable'
-0031    | SET_INDIRECT
-0032    | DUP
-0033    | GET_FIELD_OFFSET    1 (index)
-0035    | CONSTANT            5 'Value type POINTER'
-0037    | SET_INDIRECT
-0038    | SET_LOCAL           1 (slot)
-0040    2 RETURN
-0041    0 CONSTANT            6 'Value type ARRAY'
-0043    | DEFINE_GLOBAL    NameIdx:4   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
-0054    | SET_GLOBAL          4 'mixedcase_vtable' cache_id=0
-0058    5 CALL_USER_PROC       9 'run' @0018 (0 args)
-0062    0 HALT
+--- Procedure run (at 0019) ---
+0019    3 RESET_LOCAL         1 (slot)
+0021    | INIT_LOCAL_POINTER    1 (slot)    3 'MixedCase'
+0025    | ALLOC_OBJECT        2 (fields)
+0027    | DUP
+0028    | GET_FIELD_OFFSET    0 (index)
+0030    | GET_GSLOT_ADDRESS    1 'mixedcase_vtable'
+0033    | SET_INDIRECT
+0034    | DUP
+0035    | GET_FIELD_OFFSET    1 (index)
+0037    | CONSTANT            5 'Value type POINTER'
+0039    | SET_INDIRECT
+0040    | SET_LOCAL           1 (slot)
+0042    2 RETURN
+0043    0 CONSTANT            6 'Value type ARRAY'
+0045    | DEFINE_GLOBAL_SLOT Slot:1   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
+0057    | SET_GSLOT           1 'mixedcase_vtable'
+0060    5 CALL_USER_PROC       9 'run' @0019 (0 args)
+0064    0 HALT
 == End Disassembly: rea/new_local_vtable.rea ==
 
 Constants (10):\n  0000: STR   "myself"

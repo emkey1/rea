@@ -3,43 +3,43 @@
 Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
-0002    | DEFINE_GLOBAL    NameIdx:0   'myself' Type:POINTER ('')
-0007    1 JUMP                9 (to 0021)
+0002    | DEFINE_GLOBAL_SLOT Slot:0   'myself' Type:POINTER ('')
+0008    1 JUMP                9 (to 0022)
 
---- Procedure base.base (at 0012) ---
-0012    | GET_LOCAL           1 (slot)
-0014    | GET_LOCAL           0 (slot)
-0016    | GET_FIELD_OFFSET    1 (index)
-0018    | SWAP
-0019    | SET_INDIRECT
-0020    | RETURN
-0021    2 JUMP                9 (to 0035)
+--- Procedure base.base (at 0013) ---
+0013    | GET_LOCAL           1 (slot)
+0015    | GET_LOCAL           0 (slot)
+0017    | GET_FIELD_OFFSET    1 (index)
+0019    | SWAP
+0020    | SET_INDIRECT
+0021    | RETURN
+0022    2 JUMP                9 (to 0036)
 
---- Procedure child.child (at 0026) ---
-0026    | GET_LOCAL           0 (slot)
-0028    | GET_LOCAL           1 (slot)
-0030    | CALL_USER_PROC       3 'base.base' @0012 (2 args)
-0034    | RETURN
-0035    3 DEFINE_GLOBAL    NameIdx:4   'c' Type:POINTER ('Child')
-0040    | ALLOC_OBJECT        3 (fields)
-0042    | DUP
-0043    | GET_FIELD_OFFSET    0 (index)
-0045    | CONSTANT            6 'Value type POINTER'
-0047    | SET_INDIRECT
-0048    | DUP
-0049    | GET_FIELD_OFFSET    1 (index)
-0051    | CONSTANT            7 'Value type INT64'
-0053    | SET_INDIRECT
-0054    | DUP
-0055    | GET_FIELD_OFFSET    0 (index)
-0057    | CONSTANT            8 'Value type POINTER'
-0059    | SET_INDIRECT
-0060    | DUP
-0061    | PUSH_IMM_I8        42
-0063    | CALL_USER_PROC      10 'child.child' @0026 (2 args)
-0067    | SET_GLOBAL          4 'c' cache_id=0
-0071    4 CONST_1
-0072    | GET_GLOBAL          4 'c' cache_id=1
+--- Procedure child.child (at 0027) ---
+0027    | GET_LOCAL           0 (slot)
+0029    | GET_LOCAL           1 (slot)
+0031    | CALL_USER_PROC       3 'base.base' @0013 (2 args)
+0035    | RETURN
+0036    3 DEFINE_GLOBAL_SLOT Slot:1   'c' Type:POINTER ('Child')
+0042    | ALLOC_OBJECT        3 (fields)
+0044    | DUP
+0045    | GET_FIELD_OFFSET    0 (index)
+0047    | CONSTANT            6 'Value type POINTER'
+0049    | SET_INDIRECT
+0050    | DUP
+0051    | GET_FIELD_OFFSET    1 (index)
+0053    | CONSTANT            7 'Value type INT64'
+0055    | SET_INDIRECT
+0056    | DUP
+0057    | GET_FIELD_OFFSET    0 (index)
+0059    | CONSTANT            8 'Value type POINTER'
+0061    | SET_INDIRECT
+0062    | DUP
+0063    | PUSH_IMM_I8        42
+0065    | CALL_USER_PROC      10 'child.child' @0027 (2 args)
+0069    | SET_GSLOT           1 'c'
+0072    4 CONST_1
+0073    | GET_GSLOT           1 'c'
 0076    | LOAD_FIELD_VALUE    1 (index)
 0078    | CALL_BUILTIN_PROC   181 'write' (2 args)
 0084    0 HALT
