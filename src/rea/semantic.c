@@ -2516,7 +2516,7 @@ static void insertClassInfo(ClassInfo *ci) {
     Value *v = (Value *)calloc(1, sizeof(Value));
     if (!sym || !v) { free(sym); free(v); return; }
     sym->name = lowerDup(ci->name);
-    v->ptr_val = (Value *)ci;  /* store as pointer */
+    v->ptr_val = (PointerObj *)ci;  /* store as pointer -- no VM-visible type tag is set on v, so this is a raw compiler-internal slot reinterpretation, never touched by AS_POINTER/freeValue */
     sym->value = v;
     hashTableInsert(class_table, sym);
 }
@@ -2774,7 +2774,7 @@ static void collectMethods(AST *node) {
                         Value *v = (Value *)calloc(1, sizeof(Value));
                         if (sym && v) {
                             sym->name = lname;
-                            v->ptr_val = (Value *)node;
+                            v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                             sym->value = v;
                             sym->type_def = node; /* reference for signature */
                             hashTableInsert(methods, sym);
@@ -2803,7 +2803,8 @@ static void collectMethods(AST *node) {
                                 }
                                 if (pv) {
                                     pv->type = TYPE_POINTER;
-                                    pv->ptr_val = (Value *)node;
+                                    pv->ptr_val = pscalPointerObjCreate();
+                                    pv->ptr_val->address = (Value *)node;
                                 }
                                 existing->real_symbol = sym;
                                 if (mname && cls && strcasecmp(mname, cls) == 0) {
@@ -2885,7 +2886,7 @@ static void collectMethods(AST *node) {
                                 Value *v = (Value *)calloc(1, sizeof(Value));
                                 if (sym && v) {
                                     sym->name = lname;
-                                    v->ptr_val = (Value *)node;
+                                    v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                                     sym->value = v;
                                     sym->type_def = node;
                                     hashTableInsert(methods, sym);
@@ -2951,7 +2952,7 @@ static void collectMethods(AST *node) {
                             Value *v = (Value *)calloc(1, sizeof(Value));
                             if (sym && v) {
                                 sym->name = lname;
-                                v->ptr_val = (Value *)node;
+                                v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                                 sym->value = v;
                                 sym->type_def = node;
                                 hashTableInsert(methods, sym);
@@ -3188,11 +3189,11 @@ static void refreshProcedureMethodCopies(void) {
         Symbol *sym = procedure_table->buckets[i];
         while (sym) {
             AST *source = NULL;
-            if (sym->value && sym->value->ptr_val) {
-                source = (AST*)sym->value->ptr_val;
+            if (sym->value && sym->value->ptr_val && AS_POINTER(*sym->value)) {
+                source = (AST*)AS_POINTER(*sym->value);
             } else if (sym->real_symbol && sym->real_symbol->value &&
-                       sym->real_symbol->value->ptr_val) {
-                source = (AST*)sym->real_symbol->value->ptr_val;
+                       sym->real_symbol->value->ptr_val && AS_POINTER(*sym->real_symbol->value)) {
+                source = (AST*)AS_POINTER(*sym->real_symbol->value);
             }
             if (source) {
                 AST *updated = copyAST(source);
@@ -3703,17 +3704,22 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                        strdup(lex), 0, 0);
                         newType = AST_BOOLEAN;
                     } else if (v->type == TYPE_STRING) {
+                        // Two-level check: v->s_val (the StringObj wrapper)
+                        // can itself be NULL, not just its buffer -- must
+                        // not evaluate AS_STRING(*v) (dereferences s_val)
+                        // before confirming the wrapper exists.
+                        const char *str_content = (v->s_val && v->s_val->buffer) ? v->s_val->buffer : NULL;
                         tok = newToken(TOKEN_STRING_CONST,
-                                       v->s_val ? strdup(v->s_val) : strdup(""),
+                                       str_content ? strdup(str_content) : strdup(""),
                                        0, 0);
                         newType = AST_STRING;
                     } else if (v->type == TYPE_CHAR) {
                         char chbuf[2] = {(char)v->c_val, '\0'};
                         tok = newToken(TOKEN_STRING_CONST, strdup(chbuf), 0, 0);
                         newType = AST_STRING;
-                    } else if (v->type == TYPE_ENUM && v->enum_val.enum_name) {
+                    } else if (v->type == TYPE_ENUM && v->enum_val && v->enum_val->enum_name) {
                         tok = newToken(TOKEN_IDENTIFIER,
-                                       strdup(v->enum_val.enum_name), 0, 0);
+                                       strdup(v->enum_val->enum_name), 0, 0);
                         newType = AST_ENUM_VALUE;
                     } else if (isIntlikeType(v->type)) {
                         snprintf(buf, sizeof(buf), "%lld", (long long)v->i_val);
@@ -3731,7 +3737,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                         setTypeAST(node, v->type);
                         switch (v->type) {
                             case TYPE_STRING:
-                                node->i_val = v->s_val ? (int)strlen(v->s_val) : 0;
+                                node->i_val = (v->s_val && v->s_val->buffer) ? (int)strlen(v->s_val->buffer) : 0;
                                 break;
                             case TYPE_CHAR:
                                 node->i_val = 1;
@@ -3740,7 +3746,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                 node->i_val = v->i_val ? 1 : 0;
                                 break;
                             case TYPE_ENUM:
-                                node->i_val = v->enum_val.ordinal;
+                                node->i_val = v->enum_val ? v->enum_val->ordinal : 0;
                                 break;
                             default:
                                 break;
