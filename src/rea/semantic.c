@@ -1345,7 +1345,7 @@ static void registerModuleExports(ReaModuleInfo *module) {
                 AST *decl = exp->decl;
                 if (decl && decl->left) {
                     Value v = evaluateCompileTimeValue(decl->left);
-                    if (v.type != TYPE_VOID && v.type != TYPE_UNKNOWN) {
+                    if (VALUE_TYPE(v) != TYPE_VOID && VALUE_TYPE(v) != TYPE_UNKNOWN) {
                         insertConstGlobalSymbol(qualified, v);
                         addCompilerConstant(qualified, &v, decl->token ? decl->token->line : 0);
                     }
@@ -2621,12 +2621,12 @@ static void collectClasses(AST *node) {
                 sym->is_const = true;
                 if (field->left) {
                     Value v = evaluateCompileTimeValue(field->left);
-                    if (v.type != TYPE_VOID && v.type != TYPE_UNKNOWN) {
+                    if (VALUE_TYPE(v) != TYPE_VOID && VALUE_TYPE(v) != TYPE_UNKNOWN) {
                         Value *vp = (Value *)calloc(1, sizeof(Value));
                         if (vp) {
                             *vp = v; /* shallow copy; safe for numeric types */
                             sym->value = vp;
-                            sym->type = v.type;
+                            sym->type = VALUE_TYPE(v);
                         }
                     }
                 }
@@ -3693,17 +3693,17 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                     char buf[64];
                     Token *tok = NULL;
                     ASTNodeType newType = AST_NUMBER;
-                    if (v->type == TYPE_DOUBLE || v->type == TYPE_REAL ||
-                        v->type == TYPE_LONG_DOUBLE || v->type == TYPE_FLOAT) {
-                        snprintf(buf, sizeof(buf), "%Lf", v->real.r_val);
+                    if (VALUE_TYPE(*v) == TYPE_DOUBLE || VALUE_TYPE(*v) == TYPE_REAL ||
+                        VALUE_TYPE(*v) == TYPE_LONG_DOUBLE || VALUE_TYPE(*v) == TYPE_FLOAT) {
+                        snprintf(buf, sizeof(buf), "%Lf", VAL_REAL_LD(*v));
                         tok = newToken(TOKEN_REAL_CONST, strdup(buf), 0, 0);
                         newType = AST_NUMBER;
-                    } else if (v->type == TYPE_BOOLEAN) {
-                        const char *lex = v->i_val ? "true" : "false";
-                        tok = newToken(v->i_val ? TOKEN_TRUE : TOKEN_FALSE,
+                    } else if (VALUE_TYPE(*v) == TYPE_BOOLEAN) {
+                        const char *lex = VAL_INT(*v) ? "true" : "false";
+                        tok = newToken(VAL_INT(*v) ? TOKEN_TRUE : TOKEN_FALSE,
                                        strdup(lex), 0, 0);
                         newType = AST_BOOLEAN;
-                    } else if (v->type == TYPE_STRING) {
+                    } else if (VALUE_TYPE(*v) == TYPE_STRING) {
                         // Two-level check: v->s_val (the StringObj wrapper)
                         // can itself be NULL, not just its buffer -- must
                         // not evaluate AS_STRING(*v) (dereferences s_val)
@@ -3713,16 +3713,16 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                        str_content ? strdup(str_content) : strdup(""),
                                        0, 0);
                         newType = AST_STRING;
-                    } else if (v->type == TYPE_CHAR) {
-                        char chbuf[2] = {(char)v->c_val, '\0'};
+                    } else if (VALUE_TYPE(*v) == TYPE_CHAR) {
+                        char chbuf[2] = {(char)AS_CHAR(*v), '\0'};
                         tok = newToken(TOKEN_STRING_CONST, strdup(chbuf), 0, 0);
                         newType = AST_STRING;
-                    } else if (v->type == TYPE_ENUM && v->enum_val && v->enum_val->enum_name) {
+                    } else if (VALUE_TYPE(*v) == TYPE_ENUM && v->enum_val && v->enum_val->enum_name) {
                         tok = newToken(TOKEN_IDENTIFIER,
                                        strdup(v->enum_val->enum_name), 0, 0);
                         newType = AST_ENUM_VALUE;
-                    } else if (isIntlikeType(v->type)) {
-                        snprintf(buf, sizeof(buf), "%lld", (long long)v->i_val);
+                    } else if (isIntlikeType(VALUE_TYPE(*v))) {
+                        snprintf(buf, sizeof(buf), "%lld", (long long)VAL_INT(*v));
                         tok = newToken(TOKEN_INTEGER_CONST, strdup(buf), 0, 0);
                         newType = AST_NUMBER;
                     }
@@ -3734,8 +3734,8 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                         node->children = NULL;
                         node->token = tok;
                         node->type = newType;
-                        setTypeAST(node, v->type);
-                        switch (v->type) {
+                        setTypeAST(node, VALUE_TYPE(*v));
+                        switch (VALUE_TYPE(*v)) {
                             case TYPE_STRING:
                                 node->i_val = (v->s_val && v->s_val->buffer) ? (int)strlen(v->s_val->buffer) : 0;
                                 break;
@@ -3743,7 +3743,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                 node->i_val = 1;
                                 break;
                             case TYPE_BOOLEAN:
-                                node->i_val = v->i_val ? 1 : 0;
+                                node->i_val = VAL_INT(*v) ? 1 : 0;
                                 break;
                             case TYPE_ENUM:
                                 node->i_val = v->enum_val ? v->enum_val->ordinal : 0;

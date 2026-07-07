@@ -499,8 +499,9 @@ static AST *parseArrayType(ReaParser *p, AST *baseType, VarType *vtype_out, bool
         int high = -1;
         if (dimExpr) {
             Value v = evaluateCompileTimeValue(dimExpr);
-            if (v.type == TYPE_INT64 || v.type == TYPE_INT32 || v.type == TYPE_INT16 || v.type == TYPE_INT8 || v.type == TYPE_UINT64 || v.type == TYPE_UINT32 || v.type == TYPE_UINT16 || v.type == TYPE_UINT8 || v.type == TYPE_WORD || v.type == TYPE_BYTE || v.type == TYPE_INTEGER) {
-                high = (int)v.i_val - 1;
+            VarType vt = VALUE_TYPE(v);
+            if (vt == TYPE_INT64 || vt == TYPE_INT32 || vt == TYPE_INT16 || vt == TYPE_INT8 || vt == TYPE_UINT64 || vt == TYPE_UINT32 || vt == TYPE_UINT16 || vt == TYPE_UINT8 || vt == TYPE_WORD || vt == TYPE_BYTE || vt == TYPE_INTEGER) {
+                high = (int)VAL_INT(v) - 1;
             } else {
                 reaDiagf( "L%d: Array size must be a constant integer.\n", line);
             }
@@ -3758,11 +3759,11 @@ static AST *parseConstDecl(ReaParser *p) {
         if (value) setTypeAST(node, value->var_type);
         if (value) {
             Value v = evaluateCompileTimeValue(value);
-            if (v.type != TYPE_VOID && v.type != TYPE_UNKNOWN) {
+            if (VALUE_TYPE(v) != TYPE_VOID && VALUE_TYPE(v) != TYPE_UNKNOWN) {
                 if (p->functionDepth == 0) {
                     addCompilerConstant(nameTok->value, &v, nameTok->line);
                 }
-                if (!typeNode) setTypeAST(node, v.type);
+                if (!typeNode) setTypeAST(node, VALUE_TYPE(v));
             }
             freeValue(&v);
         }
