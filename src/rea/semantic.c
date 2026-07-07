@@ -2479,7 +2479,7 @@ static ClassInfo *lookupClass(const char *name) {
     lowerCopy(name, lower);
     Symbol *sym = hashTableLookup(class_table, lower);
     if (!sym || !sym->value) return NULL;
-    ClassInfo *ci = (ClassInfo *)sym->value->ptr_val;
+    ClassInfo *ci = PSCAL_VALUE_PTR(*sym->value, ClassInfo);
     if (ci) {
         ensureClassMethods(ci);
     }
@@ -2516,7 +2516,7 @@ static void insertClassInfo(ClassInfo *ci) {
     Value *v = (Value *)calloc(1, sizeof(Value));
     if (!sym || !v) { free(sym); free(v); return; }
     sym->name = lowerDup(ci->name);
-    v->ptr_val = (PointerObj *)ci;  /* store as pointer -- no VM-visible type tag is set on v, so this is a raw compiler-internal slot reinterpretation, never touched by AS_POINTER/freeValue */
+    pscalValueSetHeapPtrBits(v, ci);  /* store as pointer -- no VM-visible type tag is set on v, so this is a raw compiler-internal slot reinterpretation, never touched by AS_POINTER/freeValue */
     sym->value = v;
     hashTableInsert(class_table, sym);
 }
@@ -2543,7 +2543,7 @@ static void freeClassTable(void) {
         Symbol *s = class_table->buckets[i];
         while (s) {
             Symbol *next = s->next;
-            ClassInfo *ci = s->value ? (ClassInfo *)s->value->ptr_val : NULL;
+            ClassInfo *ci = s->value ? PSCAL_VALUE_PTR(*s->value, ClassInfo) : NULL;
             if (ci) {
                 if (ci->fields) {
                     /* Field type_defs reference the original AST; do not free them here */
@@ -2774,7 +2774,7 @@ static void collectMethods(AST *node) {
                         Value *v = (Value *)calloc(1, sizeof(Value));
                         if (sym && v) {
                             sym->name = lname;
-                            v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
+                            pscalValueSetHeapPtrBits(v, node);  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                             sym->value = v;
                             sym->type_def = node; /* reference for signature */
                             hashTableInsert(methods, sym);
@@ -2803,9 +2803,9 @@ static void collectMethods(AST *node) {
                                 }
                                 if (pv) {
                                     pv->type = TYPE_POINTER;
-                                    pv->ptr_val = pscalPointerObjCreate();
-                                    pscalValueSetHeapPtrBits(pv, pv->ptr_val);
-                                    pv->ptr_val->address = (Value *)node;
+                                    PointerObj *po = pscalPointerObjCreate();
+                                    pscalValueSetHeapPtrBits(pv, po);
+                                    po->address = (Value *)node;
                                 }
                                 existing->real_symbol = sym;
                                 if (mname && cls && strcasecmp(mname, cls) == 0) {
@@ -2887,7 +2887,7 @@ static void collectMethods(AST *node) {
                                 Value *v = (Value *)calloc(1, sizeof(Value));
                                 if (sym && v) {
                                     sym->name = lname;
-                                    v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
+                                    pscalValueSetHeapPtrBits(v, node);  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                                     sym->value = v;
                                     sym->type_def = node;
                                     hashTableInsert(methods, sym);
@@ -2953,7 +2953,7 @@ static void collectMethods(AST *node) {
                             Value *v = (Value *)calloc(1, sizeof(Value));
                             if (sym && v) {
                                 sym->name = lname;
-                                v->ptr_val = (PointerObj *)node;  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
+                                pscalValueSetHeapPtrBits(v, node);  /* raw compiler-internal slot reinterpretation, see insertClassInfo's comment */
                                 sym->value = v;
                                 sym->type_def = node;
                                 hashTableInsert(methods, sym);
@@ -2998,7 +2998,7 @@ static void linkParents(void) {
     for (int i = 0; i < HASHTABLE_SIZE; i++) {
         Symbol *s = class_table->buckets[i];
         while (s) {
-            ClassInfo *ci = s->value ? (ClassInfo *)s->value->ptr_val : NULL;
+            ClassInfo *ci = s->value ? PSCAL_VALUE_PTR(*s->value, ClassInfo) : NULL;
             if (ci && ci->parent_name && !ci->parent) {
                 ci->parent = lookupClass(ci->parent_name);
                 if (!ci->parent) {
@@ -3041,7 +3041,7 @@ static void checkOverrides(void) {
     for (int i = 0; i < HASHTABLE_SIZE; i++) {
         Symbol *s = class_table->buckets[i];
         while (s) {
-            ClassInfo *ci = s->value ? (ClassInfo *)s->value->ptr_val : NULL;
+            ClassInfo *ci = s->value ? PSCAL_VALUE_PTR(*s->value, ClassInfo) : NULL;
             if (ci && ci->parent) {
                 HashTable *methods = ensureClassMethods(ci);
                 if (!methods) {
@@ -3085,7 +3085,7 @@ static void addInheritedMethodAliases(void) {
     for (int i = 0; i < HASHTABLE_SIZE; i++) {
         Symbol *s = class_table->buckets[i];
         while (s) {
-            ClassInfo *ci = s->value ? (ClassInfo *)s->value->ptr_val : NULL;
+            ClassInfo *ci = s->value ? PSCAL_VALUE_PTR(*s->value, ClassInfo) : NULL;
             if (ci && ci->parent) {
                 HashTable *childMethods = ensureClassMethods(ci);
                 if (!childMethods) {
@@ -3190,10 +3190,10 @@ static void refreshProcedureMethodCopies(void) {
         Symbol *sym = procedure_table->buckets[i];
         while (sym) {
             AST *source = NULL;
-            if (sym->value && sym->value->ptr_val && AS_POINTER(*sym->value)) {
+            if (sym->value && AS_POINTER(*sym->value)) {
                 source = (AST*)AS_POINTER(*sym->value);
             } else if (sym->real_symbol && sym->real_symbol->value &&
-                       sym->real_symbol->value->ptr_val && AS_POINTER(*sym->real_symbol->value)) {
+                       AS_POINTER(*sym->real_symbol->value)) {
                 source = (AST*)AS_POINTER(*sym->real_symbol->value);
             }
             if (source) {
@@ -3709,7 +3709,8 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                         // can itself be NULL, not just its buffer -- must
                         // not evaluate AS_STRING(*v) (dereferences s_val)
                         // before confirming the wrapper exists.
-                        const char *str_content = (v->s_val && v->s_val->buffer) ? v->s_val->buffer : NULL;
+                        StringObj *v_str_obj = PSCAL_VALUE_PTR(*v, StringObj);
+                        const char *str_content = (v_str_obj && v_str_obj->buffer) ? v_str_obj->buffer : NULL;
                         tok = newToken(TOKEN_STRING_CONST,
                                        str_content ? strdup(str_content) : strdup(""),
                                        0, 0);
@@ -3718,9 +3719,9 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                         char chbuf[2] = {(char)AS_CHAR(*v), '\0'};
                         tok = newToken(TOKEN_STRING_CONST, strdup(chbuf), 0, 0);
                         newType = AST_STRING;
-                    } else if (VALUE_TYPE(*v) == TYPE_ENUM && v->enum_val && v->enum_val->enum_name) {
+                    } else if (VALUE_TYPE(*v) == TYPE_ENUM && PSCAL_VALUE_PTR(*v, EnumObj) && PSCAL_VALUE_PTR(*v, EnumObj)->enum_name) {
                         tok = newToken(TOKEN_IDENTIFIER,
-                                       strdup(v->enum_val->enum_name), 0, 0);
+                                       strdup(PSCAL_VALUE_PTR(*v, EnumObj)->enum_name), 0, 0);
                         newType = AST_ENUM_VALUE;
                     } else if (isIntlikeType(VALUE_TYPE(*v))) {
                         snprintf(buf, sizeof(buf), "%lld", (long long)VAL_INT(*v));
@@ -3737,18 +3738,22 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                         node->type = newType;
                         setTypeAST(node, VALUE_TYPE(*v));
                         switch (VALUE_TYPE(*v)) {
-                            case TYPE_STRING:
-                                node->i_val = (v->s_val && v->s_val->buffer) ? (int)strlen(v->s_val->buffer) : 0;
+                            case TYPE_STRING: {
+                                StringObj *v_str_obj2 = PSCAL_VALUE_PTR(*v, StringObj);
+                                node->i_val = (v_str_obj2 && v_str_obj2->buffer) ? (int)strlen(v_str_obj2->buffer) : 0;
                                 break;
+                            }
                             case TYPE_CHAR:
                                 node->i_val = 1;
                                 break;
                             case TYPE_BOOLEAN:
                                 node->i_val = VAL_INT(*v) ? 1 : 0;
                                 break;
-                            case TYPE_ENUM:
-                                node->i_val = v->enum_val ? v->enum_val->ordinal : 0;
+                            case TYPE_ENUM: {
+                                EnumObj *v_enum_obj = PSCAL_VALUE_PTR(*v, EnumObj);
+                                node->i_val = v_enum_obj ? v_enum_obj->ordinal : 0;
                                 break;
+                            }
                             default:
                                 break;
                         }
