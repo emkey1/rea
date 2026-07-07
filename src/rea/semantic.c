@@ -2804,6 +2804,7 @@ static void collectMethods(AST *node) {
                                 if (pv) {
                                     pv->type = TYPE_POINTER;
                                     pv->ptr_val = pscalPointerObjCreate();
+                                    pscalValueSetHeapPtrBits(pv, pv->ptr_val);
                                     pv->ptr_val->address = (Value *)node;
                                 }
                                 existing->real_symbol = sym;
