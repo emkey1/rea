@@ -34,6 +34,7 @@
 #include <signal.h>
 #include "vm/vm.h"
 #include "vm/vm_fx_policy.h"
+#include "ext_builtins/plugin_loader.h"
 #include "core/cache.h"
 #include "core/utils.h"
 #include "core/preproc.h"
@@ -917,6 +918,12 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         } else if (pscalFxIsCliFlag(argv[argi])) {
             const char *fx_value = (argi + 1 < argc) ? argv[argi + 1] : NULL;
             if (!pscalFxHandleCliFlag(argv[argi], fx_value)) {
+                REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
+            }
+            argi++;
+        } else if (pscalExtIsCliFlag(argv[argi])) {
+            const char *ext_value = (argi + 1 < argc) ? argv[argi + 1] : NULL;
+            if (!pscalExtHandleCliFlag(argv[argi], ext_value)) {
                 REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
             }
             argi++;
