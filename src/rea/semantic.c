@@ -1313,6 +1313,17 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
 
     registerModuleInternalProcedures(info);
 
+    /* Self-binding: a module's own body may call one of its exports through
+     * its own qualified name (e.g. `Util.helperOne(x)` from inside `mod Util`),
+     * not just the bare unqualified form. moduleFromExpression()/handleModuleCall()
+     * resolve a qualified call's receiver via findActiveBinding(), which only
+     * knows about modules reached through #import/use -- a module never
+     * imports itself, so without this the receiver lookup always missed and
+     * the call fell through to the generic receiver.method(args) path,
+     * leaving the module name as a bogus extra argument (wrong arity) and an
+     * unresolved "identifier not in scope" for the receiver itself. */
+    addBinding(&moduleBindings, info->name, info, 0, false);
+
     analyzeProgramWithBindings(ast, &moduleBindings);
     if (pushed_dir) {
         popModuleDir();
