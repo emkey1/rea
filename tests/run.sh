@@ -684,6 +684,49 @@ EOF
     return 1
 }
 
+rea_module_self_qualified_call_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    cat > "$src_dir/SelfCallModule.rea" <<'EOF'
+module SelfCallModule {
+    export int helperOne(int x) {
+        return x * 2;
+    }
+
+    export int helperTwo(int x) {
+        return SelfCallModule.helperOne(x);
+    }
+}
+EOF
+    cat > "$src_dir/main.rea" <<'EOF'
+#import "SelfCallModule.rea";
+
+writeln(SelfCallModule.helperTwo(3));
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache main.rea > "$src_dir/main.out" 2> "$src_dir/main.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("main.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/main.err")")
+    fi
+    if [ "$(cat "$src_dir/main.out")" != "6" ]; then
+        issues+=("main.rea: expected stdout '6', got: $(cat "$src_dir/main.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -858,6 +901,12 @@ if details=$(rea_module_type_global_var_decl_test); then
     harness_report PASS "rea_module_type_global_var_decl" "Imported module's class type resolves for a top-level (global-scope) var decl"
 else
     harness_report FAIL "rea_module_type_global_var_decl" "Imported module's class type resolves for a top-level (global-scope) var decl" "$details"
+fi
+
+if details=$(rea_module_self_qualified_call_test); then
+    harness_report PASS "rea_module_self_qualified_call" "A module function can call a sibling export through its own qualified name"
+else
+    harness_report FAIL "rea_module_self_qualified_call" "A module function can call a sibling export through its own qualified name" "$details"
 fi
 
 if details=$(rea_cache_binary_staleness_test); then
