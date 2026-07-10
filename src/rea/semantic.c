@@ -4198,7 +4198,12 @@ static void analyzeProgramWithBindings(AST *root, ReaModuleBindingList *bindings
     validateNodeInternal(root, NULL);
     destroyClosureRegistry();
     refreshProcedureMethodCopies();
-    freeClassTable();
+    /* class_table is intentionally NOT freed here: this function runs once
+     * per loaded module and once more for the main program within a single
+     * compilation, and class/record types declared in a module must remain
+     * resolvable (via lookupClass()) while later units -- including the main
+     * program -- are analyzed. It is freed once per compilation by
+     * reaSemanticResetState(). */
     gActiveBindings = previous;
 }
 
