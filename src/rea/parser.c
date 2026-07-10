@@ -4399,7 +4399,7 @@ static AST *reaWrapClassRefInPointer(AST *ref) {
     return ptrNode;
 }
 
-static void reaResolveForwardClassRefs(AST *node) {
+void reaResolveForwardClassRefs(AST *node) {
     if (!node) return;
     if (node->type == AST_TYPE_DECL && node->left &&
         node->left->type == AST_RECORD_TYPE &&

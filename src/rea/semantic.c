@@ -4188,6 +4188,14 @@ static void analyzeProgramWithBindings(AST *root, ReaModuleBindingList *bindings
     ReaModuleBindingList *previous = gActiveBindings;
     gActiveBindings = bindings;
     gProgramRoot = root;
+    /* Imports for `root` are fully loaded by the time we get here (both call
+     * sites run collectImportBindings() first), so class/record types an
+     * imported module exports are now in the type table. Var decls whose
+     * type names an imported class -- parsed before that class was known --
+     * are still bare AST_TYPE_REFERENCE/TYPE_UNKNOWN nodes; re-run the same
+     * fixup parseRea() uses for same-file forward class refs so it also
+     * catches ones that only resolve after module loading. */
+    reaResolveForwardClassRefs(root);
     resetClosureRegistry();
     collectClasses(root);
     collectMethods(root);
