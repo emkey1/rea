@@ -578,6 +578,64 @@ EOF
     return 1
 }
 
+# A class/record type exported from a `module { }` block must stay resolvable
+# -- for var-decl typing and for field access (p.x) -- while later units
+# (including the importing program) are analyzed. Regression for a bug where
+# the class table was freed right after each module's own analysis pass,
+# leaving importers unable to resolve fields on an imported type. Bespoke
+# (not a fixture) because it needs a second file to import.
+rea_module_type_field_access_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    cat > "$src_dir/TypeModule.rea" <<'EOF'
+module TypeModule {
+    export class Point {
+        int x;
+        int y;
+    }
+
+    export Point makeOrigin() {
+        Point p = new Point();
+        p.x = 7;
+        p.y = 9;
+        return p;
+    }
+}
+EOF
+    cat > "$src_dir/main.rea" <<'EOF'
+#import "TypeModule.rea";
+
+void run() {
+    Point p = TypeModule.makeOrigin();
+    writeln(p.x);
+}
+
+run();
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache main.rea > "$src_dir/main.out" 2> "$src_dir/main.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("main.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/main.err")")
+    fi
+    if [ "$(cat "$src_dir/main.out")" != "7" ]; then
+        issues+=("main.rea: expected stdout '7', got: $(cat "$src_dir/main.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -740,6 +798,12 @@ if details=$(rea_cache_reuse_test); then
     harness_report PASS "rea_cache_reuse" "Cache reuse surfaces bytecode reuse notice"
 else
     harness_report FAIL "rea_cache_reuse" "Cache reuse surfaces bytecode reuse notice" "$details"
+fi
+
+if details=$(rea_module_type_field_access_test); then
+    harness_report PASS "rea_module_type_field_access" "Imported module's class type stays resolvable for field access"
+else
+    harness_report FAIL "rea_module_type_field_access" "Imported module's class type stays resolvable for field access" "$details"
 fi
 
 if details=$(rea_cache_binary_staleness_test); then
