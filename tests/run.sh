@@ -636,6 +636,54 @@ EOF
     return 1
 }
 
+rea_module_type_global_var_decl_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    cat > "$src_dir/TypeModule.rea" <<'EOF'
+module TypeModule {
+    export class Point {
+        int x;
+        int y;
+    }
+
+    export Point makeOrigin() {
+        Point p = new Point();
+        p.x = 7;
+        p.y = 9;
+        return p;
+    }
+}
+EOF
+    cat > "$src_dir/main.rea" <<'EOF'
+#import "TypeModule.rea";
+
+Point p = TypeModule.makeOrigin();
+writeln(p.x);
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache main.rea > "$src_dir/main.out" 2> "$src_dir/main.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("main.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/main.err")")
+    fi
+    if [ "$(cat "$src_dir/main.out")" != "7" ]; then
+        issues+=("main.rea: expected stdout '7', got: $(cat "$src_dir/main.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -804,6 +852,12 @@ if details=$(rea_module_type_field_access_test); then
     harness_report PASS "rea_module_type_field_access" "Imported module's class type stays resolvable for field access"
 else
     harness_report FAIL "rea_module_type_field_access" "Imported module's class type stays resolvable for field access" "$details"
+fi
+
+if details=$(rea_module_type_global_var_decl_test); then
+    harness_report PASS "rea_module_type_global_var_decl" "Imported module's class type resolves for a top-level (global-scope) var decl"
+else
+    harness_report FAIL "rea_module_type_global_var_decl" "Imported module's class type resolves for a top-level (global-scope) var decl" "$details"
 fi
 
 if details=$(rea_cache_binary_staleness_test); then
