@@ -3383,7 +3383,20 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                 return;
             }
         }
-        if (node->parent && node->parent->type == AST_FIELD_ACCESS) {
+        /* This block resolves `node`'s type as *the field being accessed* in a
+         * `recv.field` expression -- only valid when `node` is the FIELD_ACCESS's
+         * `right` child (the field-name reference). `setLeft`/`setRight` both
+         * stamp `child->parent = fieldAccess`, so a bare `node->parent->type ==
+         * AST_FIELD_ACCESS` check (without the `node == fieldAccess->right`
+         * guard below) also matches the `left` child -- the receiver expression.
+         * Without the guard, a receiver whose own identifier happens to collide
+         * with one of its type's field names (e.g. `let found: T = ...;
+         * found.found` where T has a `found` field) gets its type wrongly
+         * overwritten with that field's type instead of its own declared type,
+         * corrupting the receiver and producing a spurious "Unknown field"
+         * error downstream in the compiler's field-offset resolution. */
+        if (node->parent && node->parent->type == AST_FIELD_ACCESS &&
+            node == node->parent->right) {
             AST *fieldAccess = node->parent;
             const char *clsName = resolveExprClass(fieldAccess->left, clsContext);
             if (clsName) {
