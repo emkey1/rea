@@ -787,6 +787,109 @@ EOF
     return 1
 }
 
+rea_module_private_helper_collision_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    # Regression for https://github.com/emkey1/rea/issues/5 (finding #8):
+    # two modules each declaring their own private (non-exported) helper of
+    # the same bare name must not collide. helper() is never exported by
+    # either module, so this is purely an implementation-detail name clash.
+    cat > "$src_dir/ModA.rea" <<'EOF'
+module ModA {
+    int helper(int n) { return n + 1; }
+    export int viaA(int n) { return helper(n); }
+}
+EOF
+    cat > "$src_dir/ModB.rea" <<'EOF'
+module ModB {
+    int helper(int n) { return n + 100; }
+    export int viaB(int n) { return helper(n); }
+}
+EOF
+    cat > "$src_dir/main.rea" <<'EOF'
+#import "ModA.rea";
+#import "ModB.rea";
+
+int main() {
+    writeln(viaA(1));
+    writeln(viaB(1));
+    return 0;
+}
+main();
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache main.rea > "$src_dir/main.out" 2> "$src_dir/main.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("main.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/main.err")")
+    fi
+    if [ "$(cat "$src_dir/main.out")" != "$(printf '2\n101')" ]; then
+        issues+=("main.rea: expected stdout '2\\n101', got: $(cat "$src_dir/main.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
+rea_module_imported_main_not_entry_point_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    # Regression for https://github.com/emkey1/rea/issues/5 (finding #8): a
+    # #import'ed file's own top-level main() (declared outside any module
+    # block, e.g. for that file's own standalone testing) must not shadow
+    # the importer's own main() as the program's entry point.
+    cat > "$src_dir/LibWithMain.rea" <<'EOF'
+module LibWithMain {
+    export int libDouble(int n) { return n * 2; }
+}
+int main() {
+    writeln("lib self-test: ", libDouble(21));
+    return 0;
+}
+main();
+EOF
+    cat > "$src_dir/consumer.rea" <<'EOF'
+#import "LibWithMain.rea";
+int main() {
+    writeln("consumer: ", libDouble(4));
+    return 0;
+}
+main();
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache consumer.rea > "$src_dir/consumer.out" 2> "$src_dir/consumer.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("consumer.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/consumer.err")")
+    fi
+    if [ "$(cat "$src_dir/consumer.out")" != "consumer: 8" ]; then
+        issues+=("consumer.rea: expected stdout 'consumer: 8', got: $(cat "$src_dir/consumer.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -979,6 +1082,18 @@ if details=$(rea_cache_binary_staleness_test); then
     harness_report PASS "rea_cache_binary_staleness" "Binary timestamp invalidates cached bytecode"
 else
     harness_report FAIL "rea_cache_binary_staleness" "Binary timestamp invalidates cached bytecode" "$details"
+fi
+
+if details=$(rea_module_private_helper_collision_test); then
+    harness_report PASS "rea_module_private_helper_collision" "Two modules' same-named private helpers do not collide"
+else
+    harness_report FAIL "rea_module_private_helper_collision" "Two modules' same-named private helpers do not collide" "$details"
+fi
+
+if details=$(rea_module_imported_main_not_entry_point_test); then
+    harness_report PASS "rea_module_imported_main_not_entry_point" "An imported file's own top-level main() does not shadow the importer's main()"
+else
+    harness_report FAIL "rea_module_imported_main_not_entry_point" "An imported file's own top-level main() does not shadow the importer's main()" "$details"
 fi
 
 harness_summary "Rea"

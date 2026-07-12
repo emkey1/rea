@@ -63,4 +63,14 @@ char *reaFrontendRewriteSource(const char *source, const char *path);
 void reaFrontendSetVerboseCompatibilityDiagnostics(int enable);
 int reaFrontendGetVerboseCompatibilityDiagnostics(void);
 
+/* Transient parse-time state (not a hook override): true for the duration of
+ * a reaFrontendParseSource() call made on behalf of loadModuleRecursive()
+ * (i.e. parsing a `use`d/imported dependency file), false while parsing the
+ * program's own entry file. Front-end parsers (rea/src/rea/parser.c,
+ * aether's ast_parser.c) read this to tell "my own top-level main()" apart
+ * from "a dependency file's stray top-level main()" -- see the bare "main"
+ * registration guard in each parser's function-registration tail. */
+void reaFrontendSetParsingLibraryFile(int isLibraryFile);
+int reaFrontendIsParsingLibraryFile(void);
+
 #endif /* PSCAL_REA_FRONTEND_HOOKS_H */
