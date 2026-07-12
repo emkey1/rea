@@ -3060,13 +3060,31 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
         symbol_lookup_name[sizeof(symbol_lookup_name) - 1] = '\0';
     }
 
-    Symbol *sym = target_table ? hashTableLookup(target_table, symbol_lookup_name) : NULL;
+    /* A `#import`ed/`use`d dependency file is parsed via its own, independent
+     * reaFrontendParseSource() call (loadModuleRecursive), long after the
+     * program's own entry file was already fully parsed and registered its
+     * own top-level `main`. Without this guard, a dependency file's stray
+     * top-level `main` (declared for the file's own standalone testing,
+     * outside any `module { }` block) reuses-and-overwrites the entry file's
+     * already-registered bare "main" symbol below, silently making the
+     * dependency's main the program's entry point instead. Only `main` is
+     * special-cased here (matching the language's contract that only the
+     * entry file's own main is ever the program entry point); other
+     * top-level dependency-file symbols are unaffected. */
+    bool suppress_registration = !p->inModule && !p->currentClassName &&
+                                  target_table == procedure_table &&
+                                  reaFrontendIsParsingLibraryFile() &&
+                                  strcasecmp(lower_name, "main") == 0;
+
+    Symbol *sym = (!suppress_registration && target_table)
+                      ? hashTableLookup(target_table, symbol_lookup_name)
+                      : NULL;
     if (sym && sym->is_alias && sym->real_symbol) {
         sym = sym->real_symbol;
     }
 
     bool sym_is_new = false;
-    if (!sym) {
+    if (!suppress_registration && !sym) {
         sym = (Symbol*)calloc(1, sizeof(Symbol));
         if (sym) {
             sym->name = strdup(symbol_lookup_name);

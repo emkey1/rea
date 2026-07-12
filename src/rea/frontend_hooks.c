@@ -103,3 +103,13 @@ int reaFrontendGetVerboseCompatibilityDiagnostics(void) {
     }
     return 0;
 }
+
+static int g_rea_parsing_library_file = 0;
+
+void reaFrontendSetParsingLibraryFile(int isLibraryFile) {
+    g_rea_parsing_library_file = isLibraryFile ? 1 : 0;
+}
+
+int reaFrontendIsParsingLibraryFile(void) {
+    return g_rea_parsing_library_file;
+}

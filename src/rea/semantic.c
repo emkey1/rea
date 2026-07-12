@@ -1259,7 +1259,10 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
         return NULL;
     }
 
+    int was_parsing_library = reaFrontendIsParsingLibraryFile();
+    reaFrontendSetParsingLibraryFile(1);
     AST *ast = reaFrontendParseSource(source);
+    reaFrontendSetParsingLibraryFile(was_parsing_library);
     if (!ast) {
         free(source);
         free(resolved);
