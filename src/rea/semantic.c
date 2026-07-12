@@ -3221,6 +3221,41 @@ static void refreshProcedureMethodCopies(void) {
     }
 }
 
+/* Procedure/function symbols are registered into procedure_table as a
+ * standalone copyAST() snapshot at parse time (rea's parseFunctionDecl tail
+ * and aether's registerFunctionSymbol both do this; see ast_parser.c's
+ * registerFunctionSymbol comment "mirrors rea parseFunctionDecl tail"). A
+ * parameter typed with a class exported from a `use`/`#import`ed module is
+ * still a bare AST_TYPE_REFERENCE/TYPE_UNKNOWN at that point -- the module
+ * hasn't been loaded yet -- so the snapshot bakes in the unresolved shape.
+ * reaResolveForwardClassRefs(root) above heals the *live* program tree once
+ * imports are loaded, but a procedure_table entry's type_def is a disconnected
+ * copy: healing the live tree never reaches it. Unlike refreshProcedureMethodCopies,
+ * this doesn't need sym->value to point back at a live node (aether's
+ * registerFunctionSymbol never sets it) -- reaResolveForwardClassRefs can heal
+ * the snapshot in place by re-resolving each unresolved reference against the
+ * now-fully-populated type table.
+ *
+ * Left unfixed, pscal-core's compileStatement() reads a callee's parameter
+ * type straight from this stale snapshot: resolveTypeAlias() descends into
+ * the still-bare AST_TYPE_REFERENCE, looks the class up successfully (it's
+ * loaded by compile time) and returns its AST_RECORD_TYPE node directly
+ * instead of a POINTER wrapper -- and that node's own var_type was never
+ * stamped away from newASTNode's TYPE_VOID default, so the diagnostic reports
+ * "expects type VOID" for what is actually a record-typed parameter. */
+static void resolveForwardClassRefsInProcedureTable(void) {
+    if (!procedure_table) return;
+    for (int i = 0; i < HASHTABLE_SIZE; i++) {
+        Symbol *sym = procedure_table->buckets[i];
+        while (sym) {
+            if (sym->type_def) {
+                reaResolveForwardClassRefs(sym->type_def);
+            }
+            sym = sym->next;
+        }
+    }
+}
+
 static const char *resolveExprClass(AST *expr, ClassInfo *currentClass) {
     if (!expr) return NULL;
     switch (expr->type) {
@@ -4218,8 +4253,12 @@ static void analyzeProgramWithBindings(AST *root, ReaModuleBindingList *bindings
      * type names an imported class -- parsed before that class was known --
      * are still bare AST_TYPE_REFERENCE/TYPE_UNKNOWN nodes; re-run the same
      * fixup parseRea() uses for same-file forward class refs so it also
-     * catches ones that only resolve after module loading. */
+     * catches ones that only resolve after module loading. Function/procedure
+     * parameter and return types need the same treatment, but live in a
+     * disconnected procedure_table snapshot rather than the tree walked above
+     * -- see resolveForwardClassRefsInProcedureTable(). */
     reaResolveForwardClassRefs(root);
+    resolveForwardClassRefsInProcedureTable();
     resetClosureRegistry();
     collectClasses(root);
     collectMethods(root);

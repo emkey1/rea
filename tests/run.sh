@@ -727,6 +727,66 @@ EOF
     return 1
 }
 
+rea_module_type_param_void_bare_call_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    # Regression for https://github.com/emkey1/rea/issues/6: a Void-returning
+    # function whose parameter is typed with a class exported from a different
+    # module, called as a bare statement (return value discarded), must not
+    # have its argument checked against the wrong (VOID) type. rea's own
+    # parser always builds a parameter's bare-identifier type as a pointer
+    # wrapper up front, so this exact call shape doesn't hit the bug through
+    # rea syntax -- the bug needs a frontend (aether) whose parser leaves an
+    # unresolved AST_TYPE_REFERENCE in place until a later fixup pass runs.
+    # Keep this test anyway: it pins down the compileStatement()/typesMatch()
+    # behavior for a cross-module record parameter in bare-statement call
+    # position, which is exactly the code path the fix touches.
+    cat > "$src_dir/TypeModule.rea" <<'EOF'
+module TypeModule {
+    export class Point {
+        int x;
+    }
+}
+EOF
+    cat > "$src_dir/main.rea" <<'EOF'
+#import "TypeModule.rea";
+
+void useIt(Point p) {
+    writeln(p.x);
+}
+
+void main() {
+    Point p = new Point();
+    p.x = 42;
+    useIt(p);
+}
+
+main();
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache main.rea > "$src_dir/main.out" 2> "$src_dir/main.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("main.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/main.err")")
+    fi
+    if [ "$(cat "$src_dir/main.out")" != "42" ]; then
+        issues+=("main.rea: expected stdout '42', got: $(cat "$src_dir/main.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_reuse_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -907,6 +967,12 @@ if details=$(rea_module_self_qualified_call_test); then
     harness_report PASS "rea_module_self_qualified_call" "A module function can call a sibling export through its own qualified name"
 else
     harness_report FAIL "rea_module_self_qualified_call" "A module function can call a sibling export through its own qualified name" "$details"
+fi
+
+if details=$(rea_module_type_param_void_bare_call_test); then
+    harness_report PASS "rea_module_type_param_void_bare_call" "A Void function's cross-module record parameter type-checks correctly when called as a bare statement"
+else
+    harness_report FAIL "rea_module_type_param_void_bare_call" "A Void function's cross-module record parameter type-checks correctly when called as a bare statement" "$details"
 fi
 
 if details=$(rea_cache_binary_staleness_test); then
