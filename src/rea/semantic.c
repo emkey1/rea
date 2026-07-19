@@ -3929,7 +3929,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                 }
             }
         }
-        if (!node->left && node->token && node->token->value && node->i_val == 0) {
+        if (!callDecl && !node->left && node->token && node->token->value && node->i_val == 0) {
             const char *us = strchr(node->token->value, '_');
             if (us) {
                 size_t cls_len = (size_t)(us - node->token->value);
