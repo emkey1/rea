@@ -1036,10 +1036,8 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         diagCapture.enabled = 1;
     }
     if (!diagnosticCaptureBegin(&diagCapture)) {
-        fprintf(stderr, "Failed to initialize diagnostics capture: %s\n", strerror(errno));
-        if (preprocessed_source) free(preprocessed_source);
-        free(src);
-        REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
+        fprintf(stderr, "Warning: failed to initialize diagnostics capture (%s); continuing without structured diagnostics.\n", strerror(errno));
+        diagCapture.enabled = 0;
     }
 
     if (strict_mode) reaFrontendSetStrictMode(1);
@@ -1047,7 +1045,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     AST *program = reaFrontendParseSource(effective_src);
     if (!program) {
         diagnosticCaptureEnd(&diagCapture);
-        if (diagnostics_json || diagnostics_toon) {
+        if (diagCapture.enabled) {
             char *diagText = diagnosticCaptureRead(&diagCapture);
             emitDiagnosticsFromText(stderr, diagText, diagnostics_toon);
             free(diagText);
@@ -1060,7 +1058,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     reaFrontendPerformSemanticAnalysis(program);
     if (pascal_semantic_error_count > 0 && !dump_ast_json) {
         diagnosticCaptureEnd(&diagCapture);
-        if (diagnostics_json || diagnostics_toon) {
+        if (diagCapture.enabled) {
             char *diagText = diagnosticCaptureRead(&diagCapture);
             emitDiagnosticsFromText(stderr, diagText, diagnostics_toon);
             free(diagText);
@@ -1190,7 +1188,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     }
 
     diagnosticCaptureEnd(&diagCapture);
-    if (!compilation_ok && (diagnostics_json || diagnostics_toon)) {
+    if (!compilation_ok && diagCapture.enabled) {
         char *diagText = diagnosticCaptureRead(&diagCapture);
         emitDiagnosticsFromText(stderr, diagText, diagnostics_toon);
         free(diagText);
@@ -1212,13 +1210,8 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
                 .tmp = NULL
             };
             if (runtimeDiagCapture.enabled && !diagnosticCaptureBegin(&runtimeDiagCapture)) {
-                fprintf(stderr, "Failed to initialize runtime diagnostics capture: %s\n", strerror(errno));
-                freeBytecodeChunk(&chunk);
-                freeAST(program);
-                freeProcedureTable();
-                if (preprocessed_source) free(preprocessed_source);
-                free(src);
-                REA_RETURN(vmExitWithCleanup(EXIT_FAILURE));
+                fprintf(stderr, "Warning: failed to initialize runtime diagnostics capture (%s); continuing without structured diagnostics.\n", strerror(errno));
+                runtimeDiagCapture.enabled = 0;
             }
             reaInstallSigint();
             VM vm;
