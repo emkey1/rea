@@ -1,0 +1,19 @@
+#!/usr/bin/env rea
+// Comments after an expression tail must not be misread as integer division
+int main() {
+  int i = 0;
+  while (i < 3) // loop bound; keep small.
+  {
+    i = i + 1;
+  }
+  writeln(i);
+  int j = 0;
+  while (j < 2) // tighten.
+  {
+    j = j + 1;
+  }
+  writeln(j);
+  int a = 7 // 3;
+  writeln(a);
+  return 0;
+}

@@ -106,6 +106,43 @@ static int hasExpressionSuffix(ReaLexer *lexer, size_t pos) {
     }
 }
 
+// A "//" after an expression tail is only integer division if the rest of the
+// line can plausibly continue an expression. Prose comments give themselves
+// away with adjacent bare words ("loop bound; keep small.") or a sentence-final
+// '.' — neither can appear in a valid expression tail. Scanning stops at ';'
+// (the statement ended while still expression-shaped) or at a nested "//".
+static int restLooksLikeExpression(ReaLexer *lexer, size_t pos) {
+    const char *s = lexer->source;
+    char first = s[pos];
+    if (!(isAlphaNumeric(first) || first == '_' || first == '(' ||
+          first == '-' || first == '+' || first == '!' || first == '~')) {
+        return 0;
+    }
+    int prevWasWord = 0;
+    char last = '\0';
+    size_t i = pos;
+    while (s[i] != '\0' && s[i] != '\n') {
+        char c = s[i];
+        if (c == ' ' || c == '\t' || c == '\r') {
+            i++;
+            continue;
+        }
+        if (c == ';') return 1;
+        if (c == '/' && s[i + 1] == '/') return 1;
+        if (isAlphaNumeric(c) || c == '_') {
+            if (prevWasWord) return 0;
+            prevWasWord = 1;
+            while (isAlphaNumeric(s[i]) || s[i] == '_') i++;
+            last = s[i - 1];
+            continue;
+        }
+        prevWasWord = 0;
+        last = c;
+        i++;
+    }
+    return last != '.';
+}
+
 static int slashStartsComment(ReaLexer *lexer) {
     if (lexer->pos == 0) return 1;
 
@@ -124,7 +161,8 @@ static int slashStartsComment(ReaLexer *lexer) {
 
     int rightLooksLikeExpression = 0;
     if (lookahead != 0) {
-        rightLooksLikeExpression = hasExpressionSuffix(lexer, lookahead);
+        rightLooksLikeExpression = hasExpressionSuffix(lexer, lookahead) &&
+                                   restLooksLikeExpression(lexer, lookahead);
     }
 
     size_t idx = lexer->pos;
