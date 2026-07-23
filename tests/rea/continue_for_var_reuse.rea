@@ -1,0 +1,32 @@
+// Regression: `continue` inside a for loop used to fail with a bogus
+// "identifier not in scope" (twice, at the for header) whenever the loop
+// variable's name was also bound anywhere else in the program -- a local in an
+// unrelated function, or a sibling for loop in the same function. Root cause:
+// rewriteContinueWithPost spliced its { post; continue; } compound into the
+// body without setting the compound's parent link, orphaning the copied
+// post-statement from the scope chain.
+int other() {
+  int zz = 5;
+  return zz;
+}
+int crossFn() {
+  int t = 0;
+  for (int zz = 0; zz < 3; zz = zz + 1) {
+    if (zz == 1) { continue; }
+    t = t + 10;
+  }
+  return t;
+}
+int siblings() {
+  int t = 0;
+  for (int k = 0; k < 3; k = k + 1) {
+    t = t + k;
+  }
+  for (int k = 0; k < 4; k = k + 1) {
+    if (k == 2) { continue; }
+    t = t + 100;
+  }
+  return t;
+}
+writeln(crossFn() + other());
+writeln(siblings());

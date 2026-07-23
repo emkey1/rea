@@ -624,12 +624,23 @@ static AST *rewriteContinueWithPost(AST *node, AST *postStmt) {
         addChild(comp, newASTNode(AST_CONTINUE, NULL));
         return comp;
     }
-    // Recurse
+    // Recurse. Reattach parent links on every splice: when a CONTINUE child is
+    // replaced by the new COMPOUND above, plain slot assignment would leave the
+    // compound's parent NULL, orphaning the copied post-statement from the scope
+    // chain -- semantic's upward walk then can't see the loop variable's decl and
+    // reports a bogus "identifier not in scope" whenever the same name is bound
+    // anywhere else in the program.
     node->left = rewriteContinueWithPost(node->left, postStmt);
+    if (node->left) node->left->parent = node;
     node->right = rewriteContinueWithPost(node->right, postStmt);
+    if (node->right) node->right->parent = node;
     node->extra = rewriteContinueWithPost(node->extra, postStmt);
+    if (node->extra) node->extra->parent = node;
     for (int i = 0; i < node->child_count; i++) {
-        if (node->children[i]) node->children[i] = rewriteContinueWithPost(node->children[i], postStmt);
+        if (node->children[i]) {
+            node->children[i] = rewriteContinueWithPost(node->children[i], postStmt);
+            if (node->children[i]) node->children[i]->parent = node;
+        }
     }
     return node;
 }
