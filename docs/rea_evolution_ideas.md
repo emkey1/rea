@@ -136,3 +136,15 @@ frontend could reuse.
   that reads or writes it needs to ask *whose* it is. Three sites had to be
   taught the same rule; a fourth (pscal-core's `new` resolution) had already
   been taught it. When one of these turns up again, grep for the others.
+- Same family, still open: a free function colliding with a *method* name.
+  Methods also publish a bare-name alias (`Widget.tally` -> `tally`,
+  parseFunctionDecl), so a top-level `void tally(int n)` alongside a
+  `Widget.tally()` method resolves the bare call to the method:
+  `tally(9)` reports "argument 1 to 'widget.tally' expects type POINTER but got
+  INT64" (verified 2026-08-11). Unlike the class-name collision this at least
+  fails loudly rather than silently, which is why it was left alone. The repair
+  is the constructor rule generalised: when registering an undotted routine,
+  decline to adopt *any* alias whose target carries a different name, not just
+  `Class.Class` ones. That is a bigger blast radius (module re-exports and
+  forward declarations resolve through the same lookup), so it wants its own
+  change with the full suites behind it.
