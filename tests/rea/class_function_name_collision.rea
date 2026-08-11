@@ -1,0 +1,21 @@
+// A free function whose name collides with a class must not overwrite that
+// class's constructor. A class publishes its constructor under the bare class
+// name (restoreProcedureConstructorAliases) and lookupProcedure() follows aliases
+// transparently, so defining `widget` after `class Widget` used to rebind
+// widget.widget's bytecode address to the free function's body: `new Widget(5)`
+// then ran the free function and left count at its default 0.
+//
+// Declaration order matters to the mechanism -- the alias only exists once the
+// class has been seen -- so the collision is declared after the class here, which
+// is the ordering that was broken.
+//
+// Scope note: this fixture pins constructor integrity only. Calling a free
+// function through a name that collides with a class is a separate, still-rough
+// area of Rea (a two-argument call does not even parse), so `widget` is
+// deliberately declared and not called.
+class Widget { int count; Widget(int v) { my.count = v; } }
+
+void widget(Widget t) { writeln("free fn ran - constructor was clobbered"); }
+
+Widget w = new Widget(5);
+writeln(w.count);
