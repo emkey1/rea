@@ -105,3 +105,19 @@ frontend could reuse.
   that generic type parameters also appear as unresolved TYPE_UNKNOWN
   references there, so the pass would need to know which references sit
   inside a generic scope before it can complain about the rest.
+- Class/function name-collision handling is half-resolved (found 2026-08-11
+  while fixing the Aether-side constructor mis-dispatch, pscal-core 18c8acc).
+  Rea identifiers are case-insensitive, so `class Widget` and a free
+  `void widget(...)` are one name. Constructor integrity is now correct in
+  either declaration order: `new Widget(5)` runs the real constructor, and
+  defining the free function no longer overwrites the constructor's bytecode
+  address. What remains is call-site resolution for the colliding bare name:
+  `widget(w, 9)` fails to parse ("Unexpected token COMMA"), and the single-arg
+  `widget(w)` compiles to no call at all, silently doing nothing. Neither
+  worked before the fix either (the constructor was being clobbered), so this
+  is a long-standing corner rather than a regression. The principled repair is
+  to make the bare name resolve to the free function at call sites while the
+  constructor keeps its `Class.Class` identity, i.e. stop treating the
+  bare-name constructor alias as the only meaning of that name. Worth doing
+  with a diagnostic rather than silence: a statement that compiles to nothing
+  is the worst available outcome.
