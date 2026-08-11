@@ -1,0 +1,48 @@
+// An inherited method must dispatch to the class that defines it.
+//
+// Every class used to number its own methods from zero (parser.c resets
+// currentMethodIndex at each class body), while a subclass's vtable is built by
+// filling the slots it does not define itself from its parent's table
+// (mergeParentTable, pscal-core compiler.c). Those two rules only agree when a
+// subclass's methods start after the slots its ancestors occupy. They did not,
+// so with a three-deep chain `Cube.volume` and `Square.area` both claimed slot 1
+// and `myself.area()` inside volume() dispatched back into volume():
+// "VM Error: Call stack overflow".
+//
+// Two levels were wrong in the same way but silently -- no crash, just the
+// subclass's same-indexed method running instead: perimeter() calling the
+// inherited sideCount() below returned edge*edge rather than sides*edge.
+class Shape {
+  str name;
+  int sides;
+  void Shape(str shapeName, int shapeSides) {
+    myself.name = shapeName;
+    myself.sides = shapeSides;
+  }
+  int sideCount() { return myself.sides; }
+}
+
+class Square extends Shape {
+  int edge;
+  void Square(int edgeLen) { super("square", 4); myself.edge = edgeLen; }
+  int area() { return myself.edge * myself.edge; }
+  int perimeter() { return myself.sideCount() * myself.edge; }  // parent's method
+}
+
+class Cube extends Square {
+  void Cube(int edgeLen) { super(edgeLen); }
+  int volume() { return myself.area() * myself.edge; }          // parent's method
+  int faces() { return myself.sideCount() + 2; }                // grandparent's method
+}
+
+Square q = new Square(5);
+writeln(q.area());        // 25
+writeln(q.perimeter());   // 20 -- sides(4) * edge(5), not edge * edge
+
+Cube k = new Cube(3);
+writeln(k.volume());      // 27 -- area(9) * edge(3)
+writeln(k.faces());       // 6  -- sideCount(4) + 2, two levels up
+writeln(k.area());        // 9  -- inherited method called from outside
+writeln(k.perimeter());   // 12 -- inherited method that itself calls inherited
+writeln(k.sideCount());   // 4
+writeln(k.name);          // square -- the grandparent constructor still ran

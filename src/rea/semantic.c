@@ -41,6 +41,8 @@ typedef struct ClassInfo {
     struct ClassInfo *parent; /* Resolved parent pointer */
     HashTable *fields;        /* Field symbol table */
     HashTable *methods;       /* Method symbol table */
+    int vtable_slot_count;    /* Virtual slots this class occupies, inherited included */
+    bool vtable_slots_assigned; /* Layout is computed once per class; see assignClassVTableSlots */
 } ClassInfo;
 
 static HashTable *class_table = NULL;    /* Maps class name -> ClassInfo */
@@ -3198,6 +3200,108 @@ static Symbol *lookupMethod(ClassInfo *ci, const char *name) {
     return NULL;
 }
 
+/* ------------------------------------------------------------------------- */
+/*  Virtual method slot assignment                                           */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * Each class used to number its own methods from zero -- parser.c resets
+ * `p->currentMethodIndex = 0` at every class body -- but a subclass's vtable is
+ * built by filling the slots it does not define itself from its parent's table
+ * (mergeParentTable(), pscal-core compiler.c). Those two rules only agree if a
+ * subclass's own methods start *after* the slots its ancestors already occupy.
+ * Per-class numbering collides instead: for `Cube extends Square extends Shape`,
+ * `Cube.volume` and `Square.area` both claimed slot 1, so `myself.area()` inside
+ * volume() dispatched through cube_vtable[1] back into volume() itself -- "VM
+ * Error: Call stack overflow". The two-level shape was wrong in the same way but
+ * silently: a call to an inherited method simply ran whichever method the
+ * subclass had given that index.
+ *
+ * The layout below is the usual single-inheritance one: a class's own methods
+ * start at its parent's total, an override reuses the ancestor slot it overrides,
+ * and everything else takes the next free slot.
+ *
+ * This belongs here rather than in the parser because only now -- after
+ * linkParents() -- is the whole hierarchy known, so a parent declared after its
+ * child, or imported from another module, gets the same layout as a textually
+ * ordered one. Slots are stamped on the live declaration nodes; the
+ * procedure_table snapshots (and, via real_symbol, the inherited-method aliases
+ * addInheritedMethodAliases() publishes) pick them up from there when
+ * refreshProcedureMethodCopies() re-copies at the end of the analysis pass.
+ */
+static int assignClassVTableSlots(ClassInfo *ci) {
+    if (!ci) return 0;
+    if (ci->vtable_slots_assigned) return ci->vtable_slot_count;
+    if (ci->parent_name && !ci->parent) {
+        /* Parent unresolved: either linkParents() already reported it unknown, or
+         * it lives in a unit not loaded yet. Either way we cannot know where this
+         * class's slots start, so leave it unassigned and let a later analysis
+         * pass -- this runs once per module plus once for the main program -- lay
+         * it out against a linked parent. */
+        return 0;
+    }
+    /* Claim the class before recursing so a malformed cyclic `extends` chain
+     * terminates here; linkParents() does not reject cycles. */
+    ci->vtable_slots_assigned = true;
+
+    int next = ci->parent ? assignClassVTableSlots(ci->parent) : 0;
+
+    HashTable *methods = ensureClassMethods(ci);
+    int count = 0;
+    if (methods) {
+        for (int i = 0; i < HASHTABLE_SIZE; i++) {
+            for (Symbol *m = methods->buckets[i]; m; m = m->next) {
+                if (m->type_def && m->type_def->is_virtual) count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        Symbol **ordered = (Symbol **)malloc(sizeof(Symbol *) * (size_t)count);
+        if (!ordered) {
+            ci->vtable_slot_count = next;
+            return next;
+        }
+        /* Hash order is arbitrary, so recover declaration order from the indices
+         * we are about to overwrite: the parser numbered a class's own methods
+         * 0..n-1 as it read them. */
+        int n = 0;
+        for (int i = 0; i < HASHTABLE_SIZE; i++) {
+            for (Symbol *m = methods->buckets[i]; m; m = m->next) {
+                if (!m->type_def || !m->type_def->is_virtual) continue;
+                int j = n++;
+                while (j > 0 && ordered[j - 1]->type_def->i_val > m->type_def->i_val) {
+                    ordered[j] = ordered[j - 1];
+                    j--;
+                }
+                ordered[j] = m;
+            }
+        }
+        for (int i = 0; i < n; i++) {
+            Symbol *inherited = ci->parent ? lookupMethod(ci->parent, ordered[i]->name) : NULL;
+            if (inherited && inherited->type_def && inherited->type_def->is_virtual) {
+                ordered[i]->type_def->i_val = inherited->type_def->i_val;
+            } else {
+                ordered[i]->type_def->i_val = next++;
+            }
+        }
+        free(ordered);
+    }
+
+    ci->vtable_slot_count = next;
+    return next;
+}
+
+static void assignVTableSlots(void) {
+    if (!class_table) return;
+    for (int i = 0; i < HASHTABLE_SIZE; i++) {
+        for (Symbol *s = class_table->buckets[i]; s; s = s->next) {
+            ClassInfo *ci = s->value ? PSCAL_VALUE_PTR(*s->value, ClassInfo) : NULL;
+            if (ci) assignClassVTableSlots(ci);
+        }
+    }
+}
+
 static void refreshProcedureMethodCopies(void) {
     if (!procedure_table) return;
     for (int i = 0; i < HASHTABLE_SIZE; i++) {
@@ -4266,6 +4370,7 @@ static void analyzeProgramWithBindings(AST *root, ReaModuleBindingList *bindings
     collectClasses(root);
     collectMethods(root);
     linkParents();
+    assignVTableSlots();
     checkOverrides();
     addInheritedMethodAliases();
     analyzeClosureCaptures(root);

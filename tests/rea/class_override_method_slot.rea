@@ -1,0 +1,42 @@
+// The other half of hierarchy-aware vtable layout (see
+// class_inherited_method_slot.rea): an override must reuse the slot of the
+// ancestor method it overrides, or a receiver held in a parent-typed variable
+// would dispatch to the parent's body instead of the override's.
+//
+// Both rules have to hold at once -- overrides share a slot with their ancestor,
+// genuinely new methods take a fresh one past everything inherited -- so this
+// mixes the two at every level of a three-deep chain.
+class A {
+  int n;
+  void A(int v) { myself.n = v; }
+  str tag() { return "A"; }
+  int base() { return myself.n; }
+}
+
+class B extends A {
+  void B(int v) { super(v); }
+  str tag() { return "B"; }                              // overrides A.tag
+  int twice() { return myself.base() * 2; }              // new: calls up to A
+}
+
+class C extends B {
+  void C(int v) { super(v); }
+  str tag() { return "C"; }                              // overrides B.tag in turn
+  int viaGrandparent() { return myself.base() + 100; }   // new: calls up two levels
+  str ownTag() { return myself.tag(); }                  // new: virtual on myself
+}
+
+A a = new A(1);
+B b = new B(2);
+C c = new C(3);
+
+writeln(a.tag(), b.tag(), c.tag());  // A B C -- each level's override wins
+writeln(b.twice());                  // 4
+writeln(c.twice());                  // 6  -- inherited from B, reaching A.base
+writeln(c.base());                   // 3  -- reached across two levels
+writeln(c.viaGrandparent());         // 103
+writeln(c.ownTag());                 // C  -- myself.tag() takes the override
+
+A poly = c;
+writeln(poly.tag());                 // C  -- dispatch follows the object, not the variable
+writeln(poly.base());                // 3

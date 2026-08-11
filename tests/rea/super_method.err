@@ -28,9 +28,9 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0048    | CALL_USER_PROC       7 'base.speak' @0019 (1 args)
 0052    | RETURN
 0053    0 CONSTANT            8 'Value type ARRAY'
-0055    | DEFINE_GLOBAL_SLOT Slot:1   'child_vtable' Type:ARRAY Dims:1 [0..1] of INTEGER ('integer')
+0055    | DEFINE_GLOBAL_SLOT Slot:1   'child_vtable' Type:ARRAY Dims:1 [0..2] of INTEGER ('integer')
 0067    | SET_GSLOT           1 'child_vtable'
-0070    | CONSTANT           12 'Value type ARRAY'
+0070    | CONSTANT           13 'Value type ARRAY'
 0072    | DEFINE_GLOBAL_SLOT Slot:2   'base_vtable' Type:ARRAY Dims:1 [0..1] of INTEGER ('integer')
 0084    | SET_GSLOT           2 'base_vtable'
 0087    3 DEFINE_GLOBAL_SLOT Slot:3   'c' Type:POINTER ('Child')
@@ -41,14 +41,14 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0101    | SET_INDIRECT
 0102    | DUP
 0103    | GET_FIELD_OFFSET    1 (index)
-0105    | CONSTANT           16 'Value type POINTER'
+0105    | CONSTANT           17 'Value type POINTER'
 0107    | SET_INDIRECT
 0108    | DUP
 0109    | GET_FIELD_OFFSET    1 (index)
-0111    | CONSTANT           17 'Value type POINTER'
+0111    | CONSTANT           18 'Value type POINTER'
 0113    | SET_INDIRECT
 0114    | DUP
-0115    | CALL_USER_PROC      18 'child.child' @0034 (1 args)
+0115    | CALL_USER_PROC      19 'child.child' @0034 (1 args)
 0119    | SET_GSLOT           3 'c'
 0122    0 GET_GSLOT           3 'c'
 0125    | DUP
@@ -68,7 +68,7 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0147    0 HALT
 == End Disassembly: rea/super_method.rea ==
 
-Constants (19):\n  0000: STR   "myself"
+Constants (20):\n  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: INT   1
@@ -79,12 +79,13 @@ Constants (19):\n  0000: STR   "myself"
   0008: Value type ARRAY
   0009: STR   "child_vtable"
   0010: INT   0
-  0011: STR   "integer"
-  0012: Value type ARRAY
-  0013: STR   "base_vtable"
-  0014: STR   "c"
-  0015: STR   "Child"
-  0016: Value type POINTER
+  0011: INT   2
+  0012: STR   "integer"
+  0013: Value type ARRAY
+  0014: STR   "base_vtable"
+  0015: STR   "c"
+  0016: STR   "Child"
   0017: Value type POINTER
-  0018: STR   "child.child"
+  0018: Value type POINTER
+  0019: STR   "child.child"
 
