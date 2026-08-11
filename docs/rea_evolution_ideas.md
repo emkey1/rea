@@ -105,19 +105,34 @@ frontend could reuse.
   that generic type parameters also appear as unresolved TYPE_UNKNOWN
   references there, so the pass would need to know which references sit
   inside a generic scope before it can complain about the rest.
-- Class/function name-collision handling is half-resolved (found 2026-08-11
-  while fixing the Aether-side constructor mis-dispatch, pscal-core 18c8acc).
-  Rea identifiers are case-insensitive, so `class Widget` and a free
-  `void widget(...)` are one name. Constructor integrity is now correct in
-  either declaration order: `new Widget(5)` runs the real constructor, and
-  defining the free function no longer overwrites the constructor's bytecode
-  address. What remains is call-site resolution for the colliding bare name:
-  `widget(w, 9)` fails to parse ("Unexpected token COMMA"), and the single-arg
-  `widget(w)` compiles to no call at all, silently doing nothing. Neither
-  worked before the fix either (the constructor was being clobbered), so this
-  is a long-standing corner rather than a regression. The principled repair is
-  to make the bare name resolve to the free function at call sites while the
-  constructor keeps its `Class.Class` identity, i.e. stop treating the
-  bare-name constructor alias as the only meaning of that name. Worth doing
-  with a diagnostic rather than silence: a statement that compiles to nothing
-  is the worst available outcome.
+- Class/function name-collision handling — FULLY RESOLVED (2026-08-11).
+  Found while fixing the Aether-side constructor mis-dispatch (pscal-core
+  18c8acc), which repaired the constructor half: `new Widget(5)` runs the real
+  constructor in either declaration order. The call-site half landed the same
+  day; the bare name now resolves to the free function while the constructor
+  keeps its `Class.Class` identity, as proposed here. Three separate defects,
+  all the same mistake — treating whatever occupies the shared bare name as
+  this declaration's own:
+  - parseStatement accepted `(` as a declarator opener after a type name, so
+    `widget(w);` went to parseVarDecl, which consumed the name as a type,
+    found no declarator, and returned an empty declaration group; the leftover
+    `(w)` re-parsed as a parenthesized expression. That is where the silence
+    came from, and where `widget(w, 9)`'s "Unexpected token COMMA" came from.
+    Only `Type (*fp)(...)` still takes that route.
+  - parseFunctionDecl's registration followed aliases, so a free function
+    adopted its same-named class's constructor symbol and overwrote its type,
+    type_def and arity. A VOID constructor recorded as returning Int made the
+    VM pop a bogus return value after `new` — "Cannot assign INTEGER to
+    POINTER". Only reproduced with the class declared first.
+  - ensureConstructorAliasForClass overwrote a real free function's symbol,
+    rewriting it into an alias for the constructor; it now declines on a
+    non-alias entry, like pscal-core's ensureProcedureAlias.
+  parseVarDecl no longer returns an empty declaration group at all: a type name
+  with no declarator is a diagnostic, which closes the silence structurally for
+  shapes nobody has hit yet. Pinned by tests/rea/class_function_name_collision*
+  (constructor integrity, both call shapes, and a value-returning collision in
+  both declaration orders).
+  Lesson worth keeping: the bare name is a shared namespace, and every place
+  that reads or writes it needs to ask *whose* it is. Three sites had to be
+  taught the same rule; a fourth (pscal-core's `new` resolution) had already
+  been taught it. When one of these turns up again, grep for the others.
