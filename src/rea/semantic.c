@@ -2927,12 +2927,21 @@ static void collectMethods(AST *node) {
                                         Symbol *ps = (Symbol *)calloc(1, sizeof(Symbol));
                                         if (ps) {
                                             ps->name = strdup(lowerName);
-                                            ps->type_def = node;
+                                            /* A procedure_table symbol OWNS its type_def --
+                                             * freeProcedureTable() frees it. Storing the live
+                                             * program-tree node here made teardown free it
+                                             * twice (once via freeAST(program), once here).
+                                             * Copy, exactly as the sibling block above does. */
+                                            ps->type_def = copyAST(node);
                                             hashTableInsert(procedure_table, ps);
                                             existing = ps;
                                         }
                                     } else {
-                                        existing->type_def = node;
+                                        if (existing->value && existing->type_def &&
+                                            existing->type_def != node) {
+                                            freeAST(existing->type_def);
+                                        }
+                                        existing->type_def = copyAST(node);
                                     }
                                     // Ensure bare method name aliases to the mangled symbol
                                     if (existing) {
@@ -2993,7 +3002,8 @@ static void collectMethods(AST *node) {
                                     Symbol *ps = (Symbol *)calloc(1, sizeof(Symbol));
                                     if (ps) {
                                         ps->name = strdup(lowerName);
-                                        ps->type_def = node;
+                                        /* Owned by the symbol; see the sibling blocks above. */
+                                        ps->type_def = copyAST(node);
                                         hashTableInsert(procedure_table, ps);
                                         procSym = ps;
                                     }
