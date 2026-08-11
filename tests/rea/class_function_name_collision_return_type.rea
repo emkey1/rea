@@ -1,0 +1,29 @@
+// A value-returning free function colliding with a class name, in both
+// declaration orders.
+//
+// Registering a routine reused whatever already sat under its (lowered) name,
+// following aliases. A class publishes its constructor under the bare class
+// name, so `int widget(...)` adopted `widget.widget`'s symbol and overwrote its
+// type, type_def and arity: the VOID constructor was recorded as returning Int.
+// The VM decides whether a RETURN leaves a value from that recorded type, so
+// `new Widget(5)` popped a bogus "return value" -- the constructor's own `v`
+// parameter -- and assigned it to w, failing with
+// "Type mismatch. Cannot assign INTEGER to POINTER for symbol 'w'".
+//
+// It only reproduced when the class came first (the alias has to exist before
+// the function is registered), so both orders are pinned here: Widget's function
+// follows its class, Gadget's precedes it. Each class prints a field set by its
+// constructor, which is what the corruption destroyed.
+class Widget { int count; Widget(int v) { my.count = v; } }
+int widget(Widget t) { return t.count + 100; }
+
+int gadget(int v) { return v + 200; }
+class Gadget { int tag; Gadget(int v) { my.tag = v; } }
+
+Widget w = new Widget(5);
+writeln(w.count);
+writeln(widget(w));
+
+Gadget g = new Gadget(7);
+writeln(g.tag);
+writeln(gadget(3));

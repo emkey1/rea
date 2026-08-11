@@ -1,0 +1,21 @@
+// Calling a free function through a name that collides with a class name.
+//
+// Rea identifiers are case-insensitive, so `class Widget` and `void widget(...)`
+// are one name, and a class publishes its constructor under its bare class name.
+// A statement-position `widget(w)` used to be routed to parseVarDecl as though
+// `widget` opened a declaration: that consumed the name as a type, found no
+// declarator at '(', and returned an empty declaration group, leaving `(w)` to
+// re-parse as a parenthesized expression. The call compiled to NO instructions
+// at all and the program still exited 0 -- silence, the worst available outcome.
+//
+// The companion fixture class_function_name_collision.rea pins the other half of
+// this collision (the constructor must survive the free function's definition);
+// here the free function must actually be reached, and `w.count` proves the
+// constructor still ran in the same program.
+class Widget { int count; Widget(int v) { my.count = v; } }
+
+void widget(Widget t) { writeln("free fn sees ", t.count); }
+
+Widget w = new Widget(5);
+writeln(w.count);
+widget(w);

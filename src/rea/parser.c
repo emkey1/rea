@@ -48,6 +48,13 @@ static ReaToken reaPeekToken(ReaParser *p) {
     return reaNextToken(&saved);
 }
 
+/* The token two ahead of p->current (i.e. one past what reaPeekToken returns). */
+static ReaToken reaPeekToken2(ReaParser *p) {
+    ReaLexer saved = p->lexer;
+    reaNextToken(&saved);
+    return reaNextToken(&saved);
+}
+
 /* Count of user-facing diagnostics written to stderr during the current parse.
  * Every parser diagnostic funnels through reaDiagf (all `reaDiagf( ...)`
  * sites in this file were mechanically routed to it), so a nonzero count means
@@ -116,6 +123,38 @@ static bool strictScanTop(AST* n) {
         if (strictScanTop(n->children[i])) return true;
     }
     return false;
+}
+
+/* True when `sym` is an alias published on behalf of a class's constructor -- the
+ * `Class.Class` method shape, which is exactly what restoreConstructorAliasesImpl()
+ * (pscal-core core/cache.c) and this file's own constructor-alias block below both
+ * key on, read backwards. `registeredName` is the (lowered) name being registered;
+ * an undotted one is a free function, never a constructor, and must not adopt the
+ * constructor's symbol. */
+static bool reaAliasTargetIsConstructor(const Symbol *sym, const char *registeredName) {
+    if (!sym || !sym->is_alias || !sym->real_symbol) return false;
+    if (!registeredName || strchr(registeredName, '.') != NULL) return false;
+
+    const Symbol *target = sym->real_symbol;
+    if (!target->name) return false;
+
+    const char *last_dot = strrchr(target->name, '.');
+    if (!last_dot || last_dot == target->name) return false;  /* undotted => not a method */
+    const char *method_name = last_dot + 1;
+    if (*method_name == '\0') return false;
+
+    size_t prefix_len = (size_t)(last_dot - target->name);
+    char class_buf[MAX_SYMBOL_LENGTH];
+    if (prefix_len == 0 || prefix_len >= sizeof(class_buf)) return false;
+    memcpy(class_buf, target->name, prefix_len);
+    class_buf[prefix_len] = '\0';
+
+    /* Compare simple names so a module-qualified constructor still matches. */
+    const char *class_simple = strrchr(class_buf, '.');
+    class_simple = class_simple ? class_simple + 1 : class_buf;
+    if (!*class_simple) return false;
+
+    return strcasecmp(method_name, class_simple) == 0;
 }
 
 static HashTable *reaEnsureProcedureTable(void) {
@@ -2792,6 +2831,23 @@ static AST *parseVarDecl(ReaParser *p) {
         reaAdvance(p);
     }
 
+    /* Consuming a type name and producing no declarator at all is never a valid
+     * declaration, and returning the empty group silently discards whatever the
+     * name was really part of: the caller resumes mid-construct and the remaining
+     * tokens re-parse as something unrelated (a `widget(w);` call became the
+     * parenthesized expression `(w)`, compiling to nothing and exiting 0). A
+     * statement that compiles to nothing is the worst available outcome, so fail
+     * loudly here instead -- any shape that reaches this point is malformed. */
+    if (compound->child_count == 0) {
+        const char *tname = (typeNode && typeNode->token && typeNode->token->value)
+                                ? typeNode->token->value
+                                : "<type>";
+        reaDiagf("L%d: Expected a declarator after type name '%s'.\n", p->current.line, tname);
+        p->hadError = true;
+        freeAST(compound);
+        return NULL;
+    }
+
     // baseType shares token memory with typeNode; do not free to avoid double free
     if (compound->child_count == 1) {
         AST *only = compound->children[0];
@@ -3091,7 +3147,25 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
                       ? hashTableLookup(target_table, symbol_lookup_name)
                       : NULL;
     if (sym && sym->is_alias && sym->real_symbol) {
-        sym = sym->real_symbol;
+        /* The bare name is a shared namespace: a class publishes its constructor
+         * under the plain class name (the alias built at the bottom of this
+         * function), and Rea identifiers are case-insensitive, so a free
+         * `void widget(...)` looks up the very entry `class Widget`'s constructor
+         * was published under. Adopting it would then overwrite the constructor's
+         * type/type_def/arity with this function's signature -- which is how a
+         * VOID constructor came to be recorded as returning Int, leaving the VM
+         * to pop a bogus "return value" off the stack after `new Widget(5)`
+         * ("Cannot assign INTEGER to POINTER for symbol 'w'").
+         *
+         * A free function is never a constructor, so take a symbol of our own and
+         * leave the constructor's alone; `new` still reaches it by its dotted
+         * `Class.Class` name (resolveConstructorCallName, pscal-core compiler.c).
+         * The constructor's own declaration arrives dotted and is unaffected. */
+        if (reaAliasTargetIsConstructor(sym, symbol_lookup_name)) {
+            sym = NULL;
+        } else {
+            sym = sym->real_symbol;
+        }
     }
 
     bool sym_is_new = false;
@@ -4363,9 +4437,24 @@ static AST *parseStatement(ReaParser *p) {
         namebuf[n] = '\0';
 
         ReaToken peek = reaPeekToken(p);
+        /* `TypeName (` is only a declaration when it is the pointer-to-function
+         * declarator `Widget (*fp)(int);`. Every other `name(...)` at statement
+         * position is a call -- and because Rea identifiers are case-insensitive,
+         * a free `void widget(...)` shares its name with `class Widget`, so a
+         * plain `widget(w);` used to land here and be handed to parseVarDecl.
+         * That consumed the name as a type, found no declarator at `(`, and
+         * returned an empty declaration group; the leftover `(w)` then parsed as
+         * a parenthesized expression, so the call compiled to nothing at all and
+         * a two-argument `widget(w, 9)` died on the comma. The class body parses
+         * its members through parseVarDecl directly, so the constructor shorthand
+         * `ClassName(args) { ... }` does not depend on this route. */
+        bool parenStartsDeclarator = false;
+        if (peek.type == REA_TOKEN_LEFT_PAREN) {
+            parenStartsDeclarator = (reaPeekToken2(p).type == REA_TOKEN_STAR);
+        }
         bool nextCanDeclareWithType = tokenIsIdentifierLike(peek.type) ||
                                       peek.type == REA_TOKEN_LESS ||
-                                      peek.type == REA_TOKEN_LEFT_PAREN ||
+                                      parenStartsDeclarator ||
                                       peek.type == REA_TOKEN_STAR;
         bool nextCanDeclareWithoutType = tokenIsIdentifierLike(peek.type) ||
                                          peek.type == REA_TOKEN_LESS;

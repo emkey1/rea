@@ -1,0 +1,19 @@
+// The multi-argument shape of the class/function name collision.
+//
+// This one did not even parse. A statement-position `widget(w, 9)` was routed to
+// parseVarDecl because `widget` names a class (Rea identifiers are
+// case-insensitive); parseVarDecl consumed the name as a type and stopped at
+// '(', so the leftover `(w, 9)` was re-parsed as a parenthesized expression and
+// died on the comma with "Unexpected token COMMA ',' at line N" -- a parse error
+// naming a construct the program never wrote.
+//
+// Both arguments are printed so this fixture fails if the call is dispatched
+// with the wrong arity or the wrong values (the collision previously made the
+// bare name mean the constructor, which takes an implicit receiver first).
+class Widget { int count; Widget(int v) { my.count = v; } }
+
+void widget(Widget t, int extra) { writeln("free fn sees ", t.count, " ", extra); }
+
+Widget w = new Widget(5);
+widget(w, 9);
+writeln(w.count);

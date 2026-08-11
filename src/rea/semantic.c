@@ -2670,6 +2670,19 @@ static void ensureConstructorAliasForClass(const char *cls, Symbol *target) {
         if (existing->is_alias && existing->real_symbol == target) {
             return;
         }
+        /* Publishing the constructor under the bare class name is a convenience,
+         * not a claim on the name. Rea identifiers are case-insensitive, so a real
+         * free function `void widget(...)` occupies the very entry `class Widget`
+         * wants; rewriting it into an alias would delete that function's own
+         * registration and make every `widget(...)` call site dispatch to the
+         * constructor instead. Leave a non-alias entry alone -- pscal-core's
+         * resolveConstructorCallName() consults the dotted `Class.Class` name when
+         * the bare one is occupied, so `new Widget(...)` still finds this ctor.
+         * (ensureProcedureAlias() in pscal-core core/cache.c declines for the same
+         * reason; this is that rule applied to the compile-time path.) */
+        if (!existing->is_alias) {
+            return;
+        }
         if (existing->type_def && existing->type_def != target->type_def) {
             freeAST(existing->type_def);
         }
