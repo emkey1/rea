@@ -1,0 +1,22 @@
+// A class-typed global initialised to nil. Regression: the initializer's
+// SET_GSLOT handed the nil to updateSymbolInternal, whose pointer case read
+// the nil's tag bits as a PointerObj and segfaulted before the first
+// statement ran. The globals are then reassigned to build a linked list.
+class Node {
+  int v;
+  Node next;
+}
+Node head = nil;
+Node n = nil;
+int i = 0;
+while (i < 3) {
+  n = new Node();
+  n.v = i;
+  n.next = head;
+  head = n;
+  i = i + 1;
+}
+writeln(head.v);
+writeln(head.next.v);
+writeln(head.next.next.v);
+writeln(head.next.next.next == nil);
