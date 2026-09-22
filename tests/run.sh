@@ -987,6 +987,68 @@ EOF
     return 1
 }
 
+# A cached run must behave exactly like the compile that produced it. The fixture
+# loop above compiles each program once and never loads the cache it saves, so
+# these fixtures run twice under a scratch HOME, and the second run has to be a
+# real cache hit that prints the same golden stdout. They are the class/free
+# function name collisions, in both declaration orders: a cache load that
+# restored their procedure table wrongly sent `new Gadget(7)` back to the top of
+# the program, re-running global initialisation forever ("VM Warning: Global
+# variable 'myself' redefined." in a loop), while the fresh compile passed.
+rea_cache_roundtrip_test() {
+    local fixtures=(
+        class_function_name_collision
+        class_function_name_collision_call
+        class_function_name_collision_call_multiarg
+        class_function_name_collision_return_type
+    )
+    local tmp_home src_dir name run status cache_file
+    local issues=()
+    tmp_home=$(mktemp -d)
+    src_dir=$(mktemp -d)
+
+    for name in "${fixtures[@]}"; do
+        cp "$TESTS_DIR/rea/$name.rea" "$src_dir/$name.rea"
+        # The cache is used only when strictly newer, in whole seconds, than both
+        # the source and the binary: age the source, and after the first run move
+        # the cache entry ahead so a just-relinked binary cannot make it stale.
+        shift_mtime "$src_dir/$name.rea" -5
+        for run in 1 2; do
+            set +e
+            (cd "$src_dir" && HOME="$tmp_home" python3 "$RUNNER_PY" --timeout "$TEST_TIMEOUT" \
+                "$REA_BIN" --verbose "$name.rea" > "$tmp_home/$name.out$run" 2> "$tmp_home/$name.err$run")
+            status=$?
+            set -e
+            normalise_rea_stdout "$tmp_home/$name.out$run"
+            if [ $status -ne 0 ]; then
+                issues+=("$name run $run exited with $status: $(head -3 "$tmp_home/$name.err$run")")
+                continue 2
+            fi
+            if ! diff -q "$TESTS_DIR/rea/$name.out" "$tmp_home/$name.out$run" > /dev/null; then
+                issues+=("$name run $run stdout mismatch:\n$(diff -u "$TESTS_DIR/rea/$name.out" "$tmp_home/$name.out$run" | head -20)")
+                continue 2
+            fi
+            if [ $run -eq 1 ]; then
+                for cache_file in "$tmp_home"/.pscal/bc_cache/rea-"$name".rea-*.bc; do
+                    [ -f "$cache_file" ] && shift_mtime "$cache_file" 2
+                done
+            fi
+        done
+        if ! grep -q 'Loaded cached bytecode' "$tmp_home/$name.err2"; then
+            issues+=("$name second run did not load the cache: $(head -3 "$tmp_home/$name.err2")")
+        fi
+    done
+
+    rm -rf "$tmp_home" "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%b\n' "${issues[@]}"
+    return 1
+}
+
 rea_cache_binary_staleness_test() {
     local tmp_home src_dir
     tmp_home=$(mktemp -d)
@@ -1108,6 +1170,14 @@ if details=$(rea_cache_reuse_test); then
     harness_report PASS "rea_cache_reuse" "Cache reuse surfaces bytecode reuse notice"
 else
     harness_report FAIL "rea_cache_reuse" "Cache reuse surfaces bytecode reuse notice" "$details"
+fi
+
+# Before rea_cache_binary_staleness, which pushes the binary's mtime into the
+# future and so leaves every later cache entry stale.
+if details=$(rea_cache_roundtrip_test); then
+    harness_report PASS "rea_cache_roundtrip" "A cached run of a class/function name collision prints what the compile did"
+else
+    harness_report FAIL "rea_cache_roundtrip" "A cached run of a class/function name collision prints what the compile did" "$details"
 fi
 
 if details=$(rea_module_type_field_access_test); then

@@ -157,6 +157,27 @@ static bool reaAliasTargetIsConstructor(const Symbol *sym, const char *registere
     return strcasecmp(method_name, class_simple) == 0;
 }
 
+/* True when a real routine, not an alias, already answers to `name` in `table`.
+ *
+ * The other side of reaAliasTargetIsConstructor: that one keeps a free function
+ * declared after its same-named class from adopting the constructor's symbol, and
+ * this one keeps a class declared after its same-named free function from burying
+ * the function under the constructor's bare-name aliases. hashTableInsert prepends,
+ * so an alias published later wins every lookup of the bare name: `gadget(3)`
+ * bound to the constructor, and the compiler only got it right by accident, adding
+ * a second `gadget` symbol on top when it compiled the function body. That left
+ * two non-alias `gadget` entries for the bytecode cache to write, and on a cached
+ * run the loader reached the constructor through the alias and gave it the stray
+ * entry's address 0, so `new Gadget(7)` re-ran the program's global
+ * initialisation forever. An alias yields to the routine instead, as
+ * ensureConstructorAliasForClass (semantic.c) and pscal-core's
+ * ensureProcedureAlias already do; `new` finds the constructor by its dotted
+ * `Class.Class` name (resolveConstructorCallName, pscal-core compiler.c). */
+static bool reaNameHeldByRoutine(HashTable *table, const char *name) {
+    Symbol *existing = (table && name) ? hashTableLookup(table, name) : NULL;
+    return existing && !existing->is_alias;
+}
+
 static HashTable *reaEnsureProcedureTable(void) {
     if (!procedure_table) {
         procedure_table = createHashTable();
@@ -3207,10 +3228,16 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
     }
 
     // If inside a class, also add a bare-name alias so 'obj.method(...)' can resolve.
+    // A constructor's bare name is its class name, which a free function declared
+    // earlier may already own; see reaNameHeldByRoutine for why the alias yields.
     if (p->currentClassName && sym && sym_is_new && sym->name) {
         const char* dot = strrchr(sym->name, '.');
         const char* bare = NULL;
         if (dot && *(dot + 1)) bare = dot + 1;
+        if (bare && strcasecmp(bare, p->currentClassName) == 0 &&
+            reaNameHeldByRoutine(target_table, bare)) {
+            bare = NULL;
+        }
         if (bare) {
             Symbol* alias2 = (Symbol*)calloc(1, sizeof(Symbol));
             if (alias2) {
@@ -3239,7 +3266,8 @@ static AST *parseFunctionDecl(ReaParser *p, Token *nameTok, AST *typeNode, VarTy
             size_t cls_len = (size_t)(dot - nameTok->value);
             if (strlen(p->currentClassName) == cls_len && strncasecmp(nameTok->value, p->currentClassName, cls_len) == 0) {
                 const char* after = dot + 1;
-                if (strncasecmp(after, p->currentClassName, cls_len) == 0 && after[cls_len] == '\0') {
+                if (strncasecmp(after, p->currentClassName, cls_len) == 0 && after[cls_len] == '\0' &&
+                    !reaNameHeldByRoutine(target_table, p->currentClassName)) {
                     Symbol* alias = (Symbol*)calloc(1, sizeof(Symbol));
                     if (alias) {
                         alias->name = strdup(p->currentClassName);

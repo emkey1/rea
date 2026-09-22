@@ -136,6 +136,17 @@ frontend could reuse.
   that reads or writes it needs to ask *whose* it is. Three sites had to be
   taught the same rule; a fourth (pscal-core's `new` resolution) had already
   been taught it. When one of these turns up again, grep for the others.
+  Two more turned up on 2026-09-22, when the return-type fixture hung on its
+  second (cached) run. parseFunctionDecl's constructor aliases were inserted
+  even when a free function declared *earlier* already owned the bare name,
+  and hashTableInsert prepends, so they buried it: only the compiler's extra
+  `gadget` symbol made the fresh compile work. The cache then wrote two
+  `gadget` routines, and its loader followed the alias onto the constructor,
+  giving it address 0, so `new Gadget(7)` re-ran global initialisation
+  forever. The aliases now yield to a real routine (reaNameHeldByRoutine), and
+  pscal-core's cache loader matches each entry to the non-alias routine of
+  that exact name. `rea_cache_roundtrip` in tests/run.sh runs the collision
+  fixtures twice to pin it, because the fixture loop never loads a cache.
 - Same family, still open: a free function colliding with a *method* name.
   Methods also publish a bare-name alias (`Widget.tally` -> `tally`,
   parseFunctionDecl), so a top-level `void tally(int n)` alongside a
