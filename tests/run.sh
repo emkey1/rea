@@ -860,12 +860,18 @@ int main() {
 }
 main();
 EOF
+    # The library's own `main();` is its standalone entry invocation, so it is
+    # dropped when the file is imported. It used to run as module
+    # initialisation, where it bound to the importer's main by bare name; the
+    # compiler emitted that body inline and the program's top level jumped
+    # into it, skipping the importer's own top-level statements.
     cat > "$src_dir/consumer.rea" <<'EOF'
 #import "LibWithMain.rea";
 int main() {
     writeln("consumer: ", libDouble(4));
     return 0;
 }
+writeln("importer top level");
 main();
 EOF
 
@@ -876,8 +882,58 @@ EOF
     if [ $status -ne 0 ]; then
         issues+=("consumer.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/consumer.err")")
     fi
-    if [ "$(cat "$src_dir/consumer.out")" != "consumer: 8" ]; then
-        issues+=("consumer.rea: expected stdout 'consumer: 8', got: $(cat "$src_dir/consumer.out")")
+    if [ "$(cat "$src_dir/consumer.out")" != "$(printf 'importer top level\nconsumer: 8')" ]; then
+        issues+=("consumer.rea: expected stdout 'importer top level' then 'consumer: 8', got: $(cat "$src_dir/consumer.out")")
+    fi
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
+rea_module_init_call_compiled_out_of_line_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    # A module-initialisation statement that calls a routine not compiled yet
+    # makes the compiler emit that routine's body on the spot. At top level it
+    # used to emit no JUMP around the body, so the program's top level ran
+    # into it and returned out of the program: the library's `main(21)` below
+    # (bound by bare name to the importer's main) ran with a garbage argument
+    # and the importer's own statements never ran.
+    cat > "$src_dir/LibArg.rea" <<'EOF'
+module LibArg {
+    export int libDouble(int n) { return n * 2; }
+}
+void main(int n) {
+    writeln("lib self-test: ", libDouble(n));
+}
+main(21);
+EOF
+    cat > "$src_dir/consumer.rea" <<'EOF'
+#import "LibArg.rea";
+void main(int n) {
+    writeln("consumer: ", libDouble(n));
+}
+writeln("top");
+main(4);
+EOF
+
+    set +e
+    (cd "$src_dir" && "$REA_BIN" --no-cache consumer.rea > "$src_dir/consumer.out" 2> "$src_dir/consumer.err")
+    local status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+        issues+=("consumer.rea: expected exit 0, got $status; stderr was: $(cat "$src_dir/consumer.err")")
+    fi
+    if [ "$(tail -n 2 "$src_dir/consumer.out")" != "$(printf 'top\nconsumer: 8')" ]; then
+        issues+=("consumer.rea: expected the importer's 'top' then 'consumer: 8' last, got: $(cat "$src_dir/consumer.out")")
     fi
 
     rm -rf "$src_dir"
@@ -1094,6 +1150,12 @@ if details=$(rea_module_imported_main_not_entry_point_test); then
     harness_report PASS "rea_module_imported_main_not_entry_point" "An imported file's own top-level main() does not shadow the importer's main()"
 else
     harness_report FAIL "rea_module_imported_main_not_entry_point" "An imported file's own top-level main() does not shadow the importer's main()" "$details"
+fi
+
+if details=$(rea_module_init_call_compiled_out_of_line_test); then
+    harness_report PASS "rea_module_init_call_compiled_out_of_line" "A routine compiled at a module-init call site is jumped over"
+else
+    harness_report FAIL "rea_module_init_call_compiled_out_of_line" "A routine compiled at a module-init call site is jumped over" "$details"
 fi
 
 harness_summary "Rea"
