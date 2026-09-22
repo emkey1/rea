@@ -1093,6 +1093,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     initBytecodeChunk(&chunk);
     setBytecodeChunkSourcePath(&chunk, path);
     bool used_cache = 0;
+    const char* cache_miss_reason = NULL;  // else pscalCacheLastLoadError()
     if (!no_cache) used_cache = loadBytecodeFromCache(path, kReaCompilerId, argv[0], dep_array, dep_count, &chunk);
     if (dep_array) free(dep_array);
     freeList(dep_files);
@@ -1110,10 +1111,14 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             freeBytecodeChunk(&chunk);
             initBytecodeChunk(&chunk);
             used_cache = false;
+            cache_miss_reason = "an imported file is newer than the cache entry";
         } else {
             free(cache_path);
         }
 #undef PSCAL_STAT_SEC
+    }
+    if (verbose_flag && !no_cache && !used_cache) {
+        fprintf(stderr, "Cache miss: %s\n", cache_miss_reason ? cache_miss_reason : pscalCacheLastLoadError());
     }
 
     InterpretResult result = INTERPRET_COMPILE_ERROR;
