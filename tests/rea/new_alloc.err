@@ -8,18 +8,18 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0014    | ALLOC_OBJECT        3 (fields)
 0016    | DUP
 0017    | GET_FIELD_OFFSET    0 (index)
-0019    | CONSTANT            5 'Value type POINTER'
-0021    | SET_INDIRECT
-0022    | DUP
-0023    | GET_FIELD_OFFSET    1 (index)
-0025    | CONSTANT            6 'Value type INT64'
-0027    | SET_INDIRECT
-0028    | DUP
-0029    | GET_FIELD_OFFSET    2 (index)
-0031    | CONSTANT            7 'Value type INT64'
-0033    | SET_INDIRECT
-0034    | SET_GSLOT           1 'p'
-0037    0 HALT
+0019    | PUSH_TYPE_DEFAULT POINTER     5 '__pscal_anon_pointer'
+0023    | SET_INDIRECT
+0024    | DUP
+0025    | GET_FIELD_OFFSET    1 (index)
+0027    | CONSTANT            6 'Value type INT64'
+0029    | SET_INDIRECT
+0030    | DUP
+0031    | GET_FIELD_OFFSET    2 (index)
+0033    | CONSTANT            7 'Value type INT64'
+0035    | SET_INDIRECT
+0036    | SET_GSLOT           1 'p'
+0039    0 HALT
 == End Disassembly: rea/new_alloc.rea ==
 
 Constants (8):\n  0000: STR   "myself"
@@ -27,7 +27,7 @@ Constants (8):\n  0000: STR   "myself"
   0002: STR   ""
   0003: STR   "p"
   0004: STR   "Point"
-  0005: Value type POINTER
+  0005: STR   "__pscal_anon_pointer"
   0006: Value type INT64
   0007: Value type INT64
 

@@ -41,34 +41,34 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0101    | SET_INDIRECT
 0102    | DUP
 0103    | GET_FIELD_OFFSET    1 (index)
-0105    | CONSTANT           17 'Value type POINTER'
-0107    | SET_INDIRECT
-0108    | DUP
-0109    | GET_FIELD_OFFSET    1 (index)
-0111    | CONSTANT           18 'Value type POINTER'
-0113    | SET_INDIRECT
-0114    | DUP
-0115    | CALL_USER_PROC      19 'child.child' @0034 (1 args)
-0119    | SET_GSLOT           3 'c'
-0122    0 GET_GSLOT           3 'c'
-0125    | DUP
-0126    | GET_FIELD_OFFSET    0 (index)
-0128    | GET_GSLOT_ADDRESS    1 'child_vtable'
-0131    | SET_INDIRECT
-0132    | POP
-0133    4 GET_GSLOT           3 'c'
-0136    | DUP
-0137    | GET_FIELD_OFFSET    0 (index)
-0139    | GET_INDIRECT
-0140    | CONST_1
-0141    | SWAP
-0142    | GET_ELEMENT_ADDRESS    1 (dims)
-0144    | GET_INDIRECT
-0145    | PROC_CALL_INDIRECT (args=1)
-0147    0 HALT
+0105    | PUSH_TYPE_DEFAULT POINTER    17 '__pscal_anon_pointer'
+0109    | SET_INDIRECT
+0110    | DUP
+0111    | GET_FIELD_OFFSET    1 (index)
+0113    | PUSH_TYPE_DEFAULT POINTER    17 '__pscal_anon_pointer'
+0117    | SET_INDIRECT
+0118    | DUP
+0119    | CALL_USER_PROC      18 'child.child' @0034 (1 args)
+0123    | SET_GSLOT           3 'c'
+0126    0 GET_GSLOT           3 'c'
+0129    | DUP
+0130    | GET_FIELD_OFFSET    0 (index)
+0132    | GET_GSLOT_ADDRESS    1 'child_vtable'
+0135    | SET_INDIRECT
+0136    | POP
+0137    4 GET_GSLOT           3 'c'
+0140    | DUP
+0141    | GET_FIELD_OFFSET    0 (index)
+0143    | GET_INDIRECT
+0144    | CONST_1
+0145    | SWAP
+0146    | GET_ELEMENT_ADDRESS    1 (dims)
+0148    | GET_INDIRECT
+0149    | PROC_CALL_INDIRECT (args=1)
+0151    0 HALT
 == End Disassembly: rea/super_method.rea ==
 
-Constants (20):\n  0000: STR   "myself"
+Constants (19):\n  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: INT   1
@@ -85,7 +85,6 @@ Constants (20):\n  0000: STR   "myself"
   0014: STR   "base_vtable"
   0015: STR   "c"
   0016: STR   "Child"
-  0017: Value type POINTER
-  0018: Value type POINTER
-  0019: STR   "child.child"
+  0017: STR   "__pscal_anon_pointer"
+  0018: STR   "child.child"
 

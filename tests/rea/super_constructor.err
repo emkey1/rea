@@ -24,38 +24,37 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0042    | ALLOC_OBJECT        3 (fields)
 0044    | DUP
 0045    | GET_FIELD_OFFSET    0 (index)
-0047    | CONSTANT            6 'Value type POINTER'
-0049    | SET_INDIRECT
-0050    | DUP
-0051    | GET_FIELD_OFFSET    1 (index)
-0053    | CONSTANT            7 'Value type INT64'
-0055    | SET_INDIRECT
-0056    | DUP
-0057    | GET_FIELD_OFFSET    0 (index)
-0059    | CONSTANT            8 'Value type POINTER'
-0061    | SET_INDIRECT
-0062    | DUP
-0063    | PUSH_IMM_I8        42
-0065    | CALL_USER_PROC      10 'child.child' @0027 (2 args)
-0069    | SET_GSLOT           1 'c'
-0072    4 CONST_1
-0073    | GET_GSLOT           1 'c'
-0076    | LOAD_FIELD_VALUE    1 (index)
-0078    | CALL_BUILTIN_PROC   181 'write' (2 args)
-0084    0 HALT
+0047    | PUSH_TYPE_DEFAULT POINTER     6 '__pscal_anon_pointer'
+0051    | SET_INDIRECT
+0052    | DUP
+0053    | GET_FIELD_OFFSET    1 (index)
+0055    | CONSTANT            7 'Value type INT64'
+0057    | SET_INDIRECT
+0058    | DUP
+0059    | GET_FIELD_OFFSET    0 (index)
+0061    | PUSH_TYPE_DEFAULT POINTER     6 '__pscal_anon_pointer'
+0065    | SET_INDIRECT
+0066    | DUP
+0067    | PUSH_IMM_I8        42
+0069    | CALL_USER_PROC       9 'child.child' @0027 (2 args)
+0073    | SET_GSLOT           1 'c'
+0076    4 CONST_1
+0077    | GET_GSLOT           1 'c'
+0080    | LOAD_FIELD_VALUE    1 (index)
+0082    | CALL_BUILTIN_PROC   181 'write' (2 args)
+0088    0 HALT
 == End Disassembly: rea/super_constructor.rea ==
 
-Constants (13):\n  0000: STR   "myself"
+Constants (12):\n  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "base.base"
   0004: STR   "c"
   0005: STR   "Child"
-  0006: Value type POINTER
+  0006: STR   "__pscal_anon_pointer"
   0007: Value type INT64
-  0008: Value type POINTER
-  0009: INT   42
-  0010: STR   "child.child"
-  0011: INT   1
-  0012: STR   "write"
+  0008: INT   42
+  0009: STR   "child.child"
+  0010: INT   1
+  0011: STR   "write"
 

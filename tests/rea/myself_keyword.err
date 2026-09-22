@@ -34,29 +34,29 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0072    | SET_INDIRECT
 0073    | DUP
 0074    | GET_FIELD_OFFSET    1 (index)
-0076    | CONSTANT           11 'Value type POINTER'
-0078    | SET_INDIRECT
-0079    | DUP
-0080    | GET_FIELD_OFFSET    2 (index)
-0082    | CONSTANT           12 'Value type INT64'
-0084    | SET_INDIRECT
-0085    | SET_GSLOT           2 'd'
-0088    0 GET_GSLOT           2 'd'
-0091    | DUP
-0092    | GET_FIELD_OFFSET    0 (index)
-0094    | GET_GSLOT_ADDRESS    1 'dummy_vtable'
-0097    | SET_INDIRECT
-0098    | POP
-0099    9 GET_GSLOT           2 'd'
-0102    | DUP
-0103    | GET_FIELD_OFFSET    0 (index)
-0105    | GET_INDIRECT
-0106    | CONST_0
-0107    | SWAP
-0108    | GET_ELEMENT_ADDRESS    1 (dims)
-0110    | GET_INDIRECT
-0111    | PROC_CALL_INDIRECT (args=1)
-0113    0 HALT
+0076    | PUSH_TYPE_DEFAULT POINTER    11 '__pscal_anon_pointer'
+0080    | SET_INDIRECT
+0081    | DUP
+0082    | GET_FIELD_OFFSET    2 (index)
+0084    | CONSTANT           12 'Value type INT64'
+0086    | SET_INDIRECT
+0087    | SET_GSLOT           2 'd'
+0090    0 GET_GSLOT           2 'd'
+0093    | DUP
+0094    | GET_FIELD_OFFSET    0 (index)
+0096    | GET_GSLOT_ADDRESS    1 'dummy_vtable'
+0099    | SET_INDIRECT
+0100    | POP
+0101    9 GET_GSLOT           2 'd'
+0104    | DUP
+0105    | GET_FIELD_OFFSET    0 (index)
+0107    | GET_INDIRECT
+0108    | CONST_0
+0109    | SWAP
+0110    | GET_ELEMENT_ADDRESS    1 (dims)
+0112    | GET_INDIRECT
+0113    | PROC_CALL_INDIRECT (args=1)
+0115    0 HALT
 == End Disassembly: rea/myself_keyword.rea ==
 
 Constants (13):\n  0000: STR   "myself"
@@ -70,6 +70,6 @@ Constants (13):\n  0000: STR   "myself"
   0008: STR   "integer"
   0009: STR   "d"
   0010: STR   "Dummy"
-  0011: Value type POINTER
+  0011: STR   "__pscal_anon_pointer"
   0012: Value type INT64
 

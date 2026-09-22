@@ -8,7 +8,7 @@ Offset Line Opcode           Operand  Value / Target (Args)
 
 --- Procedure mixedcase.hi (at 0013) ---
 0013    | RETURN
-0014    2 JUMP               24 (to 0043)
+0014    2 JUMP               26 (to 0045)
 
 --- Procedure run (at 0019) ---
 0019    3 RESET_LOCAL         1 (slot)
@@ -20,15 +20,15 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0033    | SET_INDIRECT
 0034    | DUP
 0035    | GET_FIELD_OFFSET    1 (index)
-0037    | CONSTANT            5 'Value type POINTER'
-0039    | SET_INDIRECT
-0040    | SET_LOCAL           1 (slot)
-0042    2 RETURN
-0043    0 CONSTANT            6 'Value type ARRAY'
-0045    | DEFINE_GLOBAL_SLOT Slot:1   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
-0057    | SET_GSLOT           1 'mixedcase_vtable'
-0060    5 CALL_USER_PROC       9 'run' @0019 (0 args)
-0064    0 HALT
+0037    | PUSH_TYPE_DEFAULT POINTER     5 '__pscal_anon_pointer'
+0041    | SET_INDIRECT
+0042    | SET_LOCAL           1 (slot)
+0044    2 RETURN
+0045    0 CONSTANT            6 'Value type ARRAY'
+0047    | DEFINE_GLOBAL_SLOT Slot:1   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
+0059    | SET_GSLOT           1 'mixedcase_vtable'
+0062    5 CALL_USER_PROC       9 'run' @0019 (0 args)
+0066    0 HALT
 == End Disassembly: rea/new_local_vtable.rea ==
 
 Constants (10):\n  0000: STR   "myself"
@@ -36,7 +36,7 @@ Constants (10):\n  0000: STR   "myself"
   0002: STR   ""
   0003: STR   "MixedCase"
   0004: STR   "mixedcase_vtable"
-  0005: Value type POINTER
+  0005: STR   "__pscal_anon_pointer"
   0006: Value type ARRAY
   0007: INT   0
   0008: STR   "integer"
