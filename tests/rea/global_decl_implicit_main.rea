@@ -1,0 +1,14 @@
+// A file of global declarations plus a main() still runs main(). A top-level
+// declaration keeps its place among the statements so its initializer runs in
+// source order, but it is not user code: the parser must still see "no
+// top-level statements" and insert the implicit main() call. Regression: an
+// intermediate version of the source-order fix counted the declarations as
+// statements, and this program silently printed nothing.
+int counter = 3;
+str greeting = "hello";
+
+int main() {
+  counter = counter + 1;
+  writeln(greeting, " ", counter);
+  return 0;
+}

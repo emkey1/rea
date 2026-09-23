@@ -4643,11 +4643,20 @@ AST *parseRea(const char *source) {
             break;
         }
 
+        // A variable declaration stays in the statement list, unlike the other
+        // top-level forms. Rea lets one sit between two statements, and what it
+        // initializes to depends on everything that ran before it -- hoisting it
+        // into `decls` would compile `int a = 1; a = 5; int b = a;` so that `b`
+        // reads `a` before the assignment. Its slot is still defined ahead of
+        // the program (the compiler hoists that much), so a declaration is
+        // visible everywhere regardless of where its initializer runs. This is
+        // the same reasoning that keeps a function body a plain ordered compound
+        // (see parseFunctionDecl above).
         if (stmt->type == AST_COMPOUND && stmt->is_global_scope) {
             for (int i = 0; i < stmt->child_count; i++) {
                 AST *child = stmt->children[i];
                 if (!child) continue;
-                if (child->type == AST_VAR_DECL || child->type == AST_FUNCTION_DECL || child->type == AST_PROCEDURE_DECL ||
+                if (child->type == AST_FUNCTION_DECL || child->type == AST_PROCEDURE_DECL ||
                     child->type == AST_TYPE_DECL || child->type == AST_CONST_DECL) {
                     addChild(decls, child);
                     
@@ -4658,7 +4667,7 @@ AST *parseRea(const char *source) {
                 stmt->children[i] = NULL;
             }
             freeAST(stmt);
-        } else if (stmt->type == AST_VAR_DECL || stmt->type == AST_FUNCTION_DECL || stmt->type == AST_PROCEDURE_DECL ||
+        } else if (stmt->type == AST_FUNCTION_DECL || stmt->type == AST_PROCEDURE_DECL ||
                    stmt->type == AST_TYPE_DECL || stmt->type == AST_CONST_DECL || stmt->type == AST_MODULE ||
                    stmt->type == AST_USES_CLAUSE) {
             addChild(decls, stmt);
@@ -4726,12 +4735,29 @@ AST *parseRea(const char *source) {
     for (int i = 0; i < decls->child_count; i++) {
         collectGlobalNamesFromDecl(decls->children[i], &global_names, &global_name_count, &global_name_capacity);
     }
+    // Top-level variables live in `stmts` now, but they are globals all the
+    // same, and the de-duplication pass below treats an unknown name as
+    // evidence that a statement belongs to some function's body.
+    for (int i = 0; i < stmts->child_count; i++) {
+        collectGlobalNamesFromDecl(stmts->children[i], &global_names, &global_name_count, &global_name_capacity);
+    }
 
     if ((function_body_nodes && function_body_node_count > 0) || function_body_range_count > 0) {
         int write_idx = 0;
         for (int i = 0; i < stmts->child_count; i++) {
             AST *s = stmts->children[i];
             if (!s) continue;
+            if (s->type == AST_VAR_DECL) {
+                // This pass rescues executable statements a rewrite orphaned
+                // from the function body they came out of. A declaration is
+                // never one of those -- it is here because that is where the
+                // source put it -- and its initializer can name things that are
+                // neither globals nor locals (a record literal's field names),
+                // which the heuristic below would read as proof it belongs to
+                // some function.
+                stmts->children[write_idx++] = s;
+                continue;
+            }
             bool duplicate = false;
             bool pointer_match = false;
             bool reattached_to_body = false;
@@ -4904,9 +4930,13 @@ AST *parseRea(const char *source) {
 
     // If a function or procedure named 'main' is declared and there are no
     // top-level statements, insert an implicit call to `main` so the VM
-    // executes user code on program start.
+    // executes user code on program start. A top-level variable declaration
+    // sits in `stmts` to keep its position (see the routing above), but it is
+    // a declaration, not user code -- a file that is nothing but globals and a
+    // `main` still needs the implicit call.
     bool has_main = false;
     bool has_app = false;
+    bool has_executable_stmt = false;
     for (int i = 0; i < decls->child_count; i++) {
         AST *d = decls->children[i];
         if (!d) continue;
@@ -4916,14 +4946,21 @@ AST *parseRea(const char *source) {
             strcasecmp(d->token->value, "main") == 0) {
             has_main = true;
         }
-
-        if (d->type == AST_VAR_DECL && d->child_count > 0 &&
-            d->children[0] && d->children[0]->token && d->children[0]->token->value &&
-            strcasecmp(d->children[0]->token->value, "app") == 0) {
+    }
+    for (int i = 0; i < stmts->child_count; i++) {
+        AST *s = stmts->children[i];
+        if (!s) continue;
+        if (s->type != AST_VAR_DECL) {
+            has_executable_stmt = true;
+            continue;
+        }
+        if (s->child_count > 0 && s->children[0] && s->children[0]->token &&
+            s->children[0]->token->value &&
+            strcasecmp(s->children[0]->token->value, "app") == 0) {
             has_app = true;
         }
     }
-    if (stmts->child_count == 0) {
+    if (!has_executable_stmt) {
         if (has_main) {
             Token *mainTok = newToken(TOKEN_IDENTIFIER, "main", 0, 0);
             AST *call = newASTNode(AST_PROCEDURE_CALL, mainTok);

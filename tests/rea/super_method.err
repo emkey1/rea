@@ -4,40 +4,40 @@ Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
 0002    | DEFINE_GLOBAL_SLOT Slot:0   'myself' Type:POINTER ('')
-0008    1 JUMP                1 (to 0014)
+0008    3 DEFINE_GLOBAL_SLOT Slot:1   'c' Type:POINTER ('Child')
+0014    1 JUMP                1 (to 0020)
 
---- Procedure base.base (at 0013) ---
-0013    | RETURN
-0014    | JUMP               10 (to 0029)
+--- Procedure base.base (at 0019) ---
+0019    | RETURN
+0020    | JUMP               10 (to 0035)
 
---- Procedure base.speak (at 0019) ---
-0019    | CONST_1
-0020    | CONSTANT            4 'base'
-0022    | CALL_BUILTIN_PROC   181 'write' (2 args)
-0028    | RETURN
-0029    2 JUMP                7 (to 0041)
+--- Procedure base.speak (at 0025) ---
+0025    | CONST_1
+0026    | CONSTANT            6 'base'
+0028    | CALL_BUILTIN_PROC   181 'write' (2 args)
+0034    | RETURN
+0035    2 JUMP                7 (to 0047)
 
---- Procedure child.child (at 0034) ---
-0034    | GET_LOCAL           0 (slot)
-0036    | CALL_USER_PROC       6 'base.base' @0013 (1 args)
-0040    | RETURN
-0041    | JUMP                7 (to 0053)
+--- Procedure child.child (at 0040) ---
+0040    | GET_LOCAL           0 (slot)
+0042    | CALL_USER_PROC       8 'base.base' @0019 (1 args)
+0046    | RETURN
+0047    | JUMP                7 (to 0059)
 
---- Procedure child.speak (at 0046) ---
-0046    | GET_LOCAL           0 (slot)
-0048    | CALL_USER_PROC       7 'base.speak' @0019 (1 args)
-0052    | RETURN
-0053    0 CONSTANT            8 'Value type ARRAY'
-0055    | DEFINE_GLOBAL_SLOT Slot:1   'child_vtable' Type:ARRAY Dims:1 [0..2] of INTEGER ('integer')
-0067    | SET_GSLOT           1 'child_vtable'
-0070    | CONSTANT           13 'Value type ARRAY'
-0072    | DEFINE_GLOBAL_SLOT Slot:2   'base_vtable' Type:ARRAY Dims:1 [0..1] of INTEGER ('integer')
-0084    | SET_GSLOT           2 'base_vtable'
-0087    3 DEFINE_GLOBAL_SLOT Slot:3   'c' Type:POINTER ('Child')
-0093    | ALLOC_OBJECT        3 (fields)
+--- Procedure child.speak (at 0052) ---
+0052    | GET_LOCAL           0 (slot)
+0054    | CALL_USER_PROC       9 'base.speak' @0025 (1 args)
+0058    | RETURN
+0059    0 CONSTANT           10 'Value type ARRAY'
+0061    | DEFINE_GLOBAL_SLOT Slot:2   'child_vtable' Type:ARRAY Dims:1 [0..2] of INTEGER ('integer')
+0073    | SET_GSLOT           2 'child_vtable'
+0076    | CONSTANT           15 'Value type ARRAY'
+0078    | DEFINE_GLOBAL_SLOT Slot:3   'base_vtable' Type:ARRAY Dims:1 [0..1] of INTEGER ('integer')
+0090    | SET_GSLOT           3 'base_vtable'
+0093    3 ALLOC_OBJECT        3 (fields)
 0095    | DUP
 0096    | GET_FIELD_OFFSET    0 (index)
-0098    | GET_GSLOT_ADDRESS    1 'child_vtable'
+0098    | GET_GSLOT_ADDRESS    2 'child_vtable'
 0101    | SET_INDIRECT
 0102    | DUP
 0103    | GET_FIELD_OFFSET    1 (index)
@@ -48,43 +48,37 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0113    | PUSH_TYPE_DEFAULT POINTER    17 '__pscal_anon_pointer'
 0117    | SET_INDIRECT
 0118    | DUP
-0119    | CALL_USER_PROC      18 'child.child' @0034 (1 args)
-0123    | SET_GSLOT           3 'c'
-0126    0 GET_GSLOT           3 'c'
+0119    | CALL_USER_PROC      18 'child.child' @0040 (1 args)
+0123    | SET_GSLOT           1 'c'
+0126    4 GET_GSLOT           1 'c'
 0129    | DUP
 0130    | GET_FIELD_OFFSET    0 (index)
-0132    | GET_GSLOT_ADDRESS    1 'child_vtable'
-0135    | SET_INDIRECT
-0136    | POP
-0137    4 GET_GSLOT           3 'c'
-0140    | DUP
-0141    | GET_FIELD_OFFSET    0 (index)
-0143    | GET_INDIRECT
-0144    | CONST_1
-0145    | SWAP
-0146    | GET_ELEMENT_ADDRESS    1 (dims)
-0148    | GET_INDIRECT
-0149    | PROC_CALL_INDIRECT (args=1)
-0151    0 HALT
+0132    | GET_INDIRECT
+0133    | CONST_1
+0134    | SWAP
+0135    | GET_ELEMENT_ADDRESS    1 (dims)
+0137    | GET_INDIRECT
+0138    | PROC_CALL_INDIRECT (args=1)
+0140    0 HALT
 == End Disassembly: rea/super_method.rea ==
 
 Constants (19):\n  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
-  0003: INT   1
-  0004: STR   "base"
-  0005: STR   "write"
-  0006: STR   "base.base"
-  0007: STR   "base.speak"
-  0008: Value type ARRAY
-  0009: STR   "child_vtable"
-  0010: INT   0
-  0011: INT   2
-  0012: STR   "integer"
-  0013: Value type ARRAY
-  0014: STR   "base_vtable"
-  0015: STR   "c"
-  0016: STR   "Child"
+  0003: STR   "c"
+  0004: STR   "Child"
+  0005: INT   1
+  0006: STR   "base"
+  0007: STR   "write"
+  0008: STR   "base.base"
+  0009: STR   "base.speak"
+  0010: Value type ARRAY
+  0011: STR   "child_vtable"
+  0012: INT   0
+  0013: INT   2
+  0014: STR   "integer"
+  0015: Value type ARRAY
+  0016: STR   "base_vtable"
   0017: STR   "__pscal_anon_pointer"
   0018: STR   "child.child"
 

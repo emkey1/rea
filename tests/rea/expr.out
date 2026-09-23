@@ -12,6 +12,13 @@
     {
 
       "node_type": "COMPOUND",
+      "var_type_annotated": "VOID"
+    }
+,
+    "body": 
+    {
+
+      "node_type": "COMPOUND",
       "var_type_annotated": "VOID",
       "children": [
         {
@@ -159,16 +166,7 @@
               "var_type_annotated": "BOOLEAN"
             }
           ]
-        }
-      ]
-    }
-,
-    "body": 
-    {
-
-      "node_type": "COMPOUND",
-      "var_type_annotated": "VOID",
-      "children": [
+        },
         {
 
           "node_type": "ASSIGN",

@@ -4,24 +4,24 @@ Offset Line Opcode           Operand  Value / Target (Args)
 ------ ---- ---------------- -------- --------------------------
 0000    0 CONSTANT            1 'nil'
 0002    | DEFINE_GLOBAL_SLOT Slot:0   'myself' Type:POINTER ('')
-0008    1 JUMP                9 (to 0022)
+0008    3 DEFINE_GLOBAL_SLOT Slot:1   'c' Type:POINTER ('Child')
+0014    1 JUMP                9 (to 0028)
 
---- Procedure base.base (at 0013) ---
-0013    | GET_LOCAL           1 (slot)
-0015    | GET_LOCAL           0 (slot)
-0017    | GET_FIELD_OFFSET    1 (index)
-0019    | SWAP
-0020    | SET_INDIRECT
-0021    | RETURN
-0022    2 JUMP                9 (to 0036)
+--- Procedure base.base (at 0019) ---
+0019    | GET_LOCAL           1 (slot)
+0021    | GET_LOCAL           0 (slot)
+0023    | GET_FIELD_OFFSET    1 (index)
+0025    | SWAP
+0026    | SET_INDIRECT
+0027    | RETURN
+0028    2 JUMP                9 (to 0042)
 
---- Procedure child.child (at 0027) ---
-0027    | GET_LOCAL           0 (slot)
-0029    | GET_LOCAL           1 (slot)
-0031    | CALL_USER_PROC       3 'base.base' @0013 (2 args)
-0035    | RETURN
-0036    3 DEFINE_GLOBAL_SLOT Slot:1   'c' Type:POINTER ('Child')
-0042    | ALLOC_OBJECT        3 (fields)
+--- Procedure child.child (at 0033) ---
+0033    | GET_LOCAL           0 (slot)
+0035    | GET_LOCAL           1 (slot)
+0037    | CALL_USER_PROC       5 'base.base' @0019 (2 args)
+0041    | RETURN
+0042    3 ALLOC_OBJECT        3 (fields)
 0044    | DUP
 0045    | GET_FIELD_OFFSET    0 (index)
 0047    | PUSH_TYPE_DEFAULT POINTER     6 '__pscal_anon_pointer'
@@ -36,7 +36,7 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0065    | SET_INDIRECT
 0066    | DUP
 0067    | PUSH_IMM_I8        42
-0069    | CALL_USER_PROC       9 'child.child' @0027 (2 args)
+0069    | CALL_USER_PROC       9 'child.child' @0033 (2 args)
 0073    | SET_GSLOT           1 'c'
 0076    4 CONST_1
 0077    | GET_GSLOT           1 'c'
@@ -48,9 +48,9 @@ Offset Line Opcode           Operand  Value / Target (Args)
 Constants (12):\n  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
-  0003: STR   "base.base"
-  0004: STR   "c"
-  0005: STR   "Child"
+  0003: STR   "c"
+  0004: STR   "Child"
+  0005: STR   "base.base"
   0006: STR   "__pscal_anon_pointer"
   0007: Value type INT64
   0008: INT   42

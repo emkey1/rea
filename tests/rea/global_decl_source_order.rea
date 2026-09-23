@@ -1,0 +1,39 @@
+// A top-level declaration's initializer runs where the declaration stands, not
+// ahead of the statements above it. Regression: the parser hoisted every global
+// declaration into the program's declaration section, so the compiler emitted
+// all of their initializers as one block before the first statement -- `b` read
+// `a` as 1, and `other` was bound to `head` while it was still nil.
+int a = 1;
+a = 5;
+int b = a;
+writeln(b);
+
+class Node {
+  int v;
+}
+
+Node head = nil;
+head = new Node();
+head.v = 7;
+Node other = head;
+writeln(other.v);
+
+// The binding itself is still hoisted: a routine declared before a global can
+// read and write it, whatever order the two appear in.
+void bump() {
+  counter = counter + 1;
+}
+int counter = 10;
+bump();
+writeln(counter);
+
+// A declaration reads the value the loop above it left behind.
+int total = 0;
+int i = 0;
+while (i < 4) {
+  total = total + i;
+  i = i + 1;
+}
+int captured = total;
+total = 99;
+writeln(captured);

@@ -5,19 +5,19 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0000    0 CONSTANT            1 'nil'
 0002    | DEFINE_GLOBAL_SLOT Slot:0   'myself' Type:POINTER ('')
 0008    1 DEFINE_GLOBAL_SLOT Slot:1   'a' Type:INT64 ('__pscal_anon_type_1')
-0014    | CONST_1
-0015    | PUSH_IMM_I8         2
-0017    | PUSH_IMM_I8         3
-0019    | MULTIPLY
-0020    | ADD
-0021    | SET_GSLOT           1 'a'
-0024    2 DEFINE_GLOBAL_SLOT Slot:2   'b' Type:BOOLEAN ('__pscal_anon_type_2')
-0030    | GET_GSLOT           1 'a'
-0033    | PUSH_IMM_I8         7
-0035    | GREATER_EQUAL
-0036    | SET_GSLOT           2 'b'
-0039    3 DEFINE_GLOBAL_SLOT Slot:3   'msg' Type:UNICODESTRING ('__pscal_anon_type_3')
-0045    | CONSTANT           13 'hi'
+0014    2 DEFINE_GLOBAL_SLOT Slot:2   'b' Type:BOOLEAN ('__pscal_anon_type_2')
+0020    3 DEFINE_GLOBAL_SLOT Slot:3   'msg' Type:UNICODESTRING ('__pscal_anon_type_3')
+0026    1 CONST_1
+0027    | PUSH_IMM_I8         2
+0029    | PUSH_IMM_I8         3
+0031    | MULTIPLY
+0032    | ADD
+0033    | SET_GSLOT           1 'a'
+0036    2 GET_GSLOT           1 'a'
+0039    | PUSH_IMM_I8         7
+0041    | GREATER_EQUAL
+0042    | SET_GSLOT           2 'b'
+0045    3 CONSTANT           13 'hi'
 0047    | SET_GSLOT           3 'msg'
 0050    4 GET_GSLOT           1 'a'
 0053    | NEGATE
@@ -34,14 +34,14 @@ Constants (15):\n  0000: STR   "myself"
   0002: STR   ""
   0003: STR   "a"
   0004: STR   "__pscal_anon_type_1"
-  0005: INT   1
-  0006: INT   2
-  0007: INT   3
-  0008: STR   "b"
-  0009: STR   "__pscal_anon_type_2"
-  0010: INT   7
-  0011: STR   "msg"
-  0012: STR   "__pscal_anon_type_3"
+  0005: STR   "b"
+  0006: STR   "__pscal_anon_type_2"
+  0007: STR   "msg"
+  0008: STR   "__pscal_anon_type_3"
+  0009: INT   1
+  0010: INT   2
+  0011: INT   3
+  0012: INT   7
   0013: STR   "hi"
   0014: INT   4
 
