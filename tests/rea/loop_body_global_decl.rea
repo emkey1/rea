@@ -1,0 +1,42 @@
+// A declaration in the body of a top-level loop has no function frame to live
+// in, so it compiles to a DEFINE_GLOBAL_SLOT *inside* the loop and re-runs on
+// every iteration. Re-initialising the value each time is the point; the "VM
+// Warning: Global variable '<name>' redefined." the VM used to print alongside
+// it was not. This fixture has no .err golden, so stderr must be empty.
+
+class Node {
+  int v;
+}
+
+int i = 0;
+int total = 0;
+while (i < 3) {
+  int k = i * 2;          // scalar
+  int box[2];             // array: the VM rebuilds it per iteration
+  box[0] = k;
+  box[1] = 1;
+  Node n = new Node();    // class-typed (pointer)
+  n.v = box[0] + box[1];
+  total = total + k + n.v;
+  i = i + 1;
+}
+writeln(total);
+
+// Every loop form takes the same path, and a nested loop redefines from two
+// distinct instructions.
+int j = 0;
+for (int f = 0; f < 2; f = f + 1) {
+  int fv = f + 1;
+  j = j + fv;
+}
+int outer = 0;
+while (outer < 2) {
+  int inner = 0;
+  while (inner < 2) {
+    int deep = 1;
+    j = j + deep;
+    inner = inner + 1;
+  }
+  outer = outer + 1;
+}
+writeln(j);
