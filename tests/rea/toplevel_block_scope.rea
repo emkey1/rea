@@ -1,0 +1,58 @@
+// A declaration in a block of the main program is local to that block, even
+// though there is no function frame to hold it and it lives in a global slot.
+// That slot used to be named after the variable, so every block shared it:
+// two sibling blocks that each declared `k` printed "VM Warning: Global
+// variable 'k' redefined." to stderr, declaring it as an int in one block and
+// a str in the next stopped the program with a type-mismatch runtime error,
+// and a block-local that shadowed a real global overwrote that global.
+// No .err golden, so stderr must be empty.
+
+class Shape {
+  int w;
+  Shape(int ww) { my.w = ww; }
+  int area() { return my.w; }
+}
+
+class Square extends Shape {
+  Square(int ww) { super(ww); }
+  int area() { return my.w * my.w; }
+}
+
+// The reported shape: sibling blocks, one name.
+int i = 0;
+if (i < 2) { int k = 7; i = i + k; }
+if (i < 20) { int k = 7; i = i + k; }
+writeln(i);                               // 14
+
+// Same name, different types in sibling blocks.
+if (true) { int v = 5; writeln(v); }      // 5
+if (true) { str v = "five"; writeln(v); } // five
+if (true) { int v[2]; v[0] = 3; v[1] = 4; writeln(v[0] + v[1]); } // 7
+
+// A block-local shadows a global without touching it; nested blocks shadow
+// each other, and the outer block's binding is back after the inner block.
+int g = 100;
+if (g > 0) {
+  int g = 1;
+  if (g == 1) {
+    int g = 2;
+    writeln(g);                           // 2
+  }
+  writeln(g);                             // 1
+}
+writeln(g);                               // 100
+
+// Sibling C-style for loops reuse the loop variable and a body local.
+int sum = 0;
+for (int j = 0; j < 3; j++) { int t = j; sum = sum + t; }
+for (int j = 10; j < 12; j++) { int t = j; sum = sum + t; }
+writeln(sum);                             // 24
+
+// Class-typed block locals keep their own object and dispatch through it.
+if (true) { Shape s = new Square(4); writeln(s.area()); } // 16
+if (true) { Shape s = new Shape(3); writeln(s.area()); }  // 3
+
+// A global of the same name declared after the blocks is a separate variable.
+if (true) { int late = 1; writeln(late); }  // 1
+int late = 5;
+writeln(late);                            // 5

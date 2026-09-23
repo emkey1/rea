@@ -11,10 +11,10 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0021    | CONST_0
 0022    | EQUAL
 0023    | JUMP_IF_FALSE      18 (to 0046)
-0028    3 DEFINE_GLOBAL_SLOT Slot:2   'y' Type:INT64 ('__pscal_anon_type_2')
+0028    3 DEFINE_GLOBAL_SLOT Slot:2   'y@1' Type:INT64 ('__pscal_anon_type_2')
 0034    | CONST_1
-0035    | SET_GSLOT           2 'y'
-0038    4 GET_GSLOT           2 'y'
+0035    | SET_GSLOT           2 'y@1'
+0038    4 GET_GSLOT           2 'y@1'
 0041    | GET_GSLOT_ADDRESS    1 'x'
 0044    | SWAP
 0045    | SET_INDIRECT
@@ -28,7 +28,7 @@ Constants (9):
   0003: STR   "x"
   0004: STR   "__pscal_anon_type_1"
   0005: INT   0
-  0006: STR   "y"
+  0006: STR   "y@1"
   0007: STR   "__pscal_anon_type_2"
   0008: INT   1
 
