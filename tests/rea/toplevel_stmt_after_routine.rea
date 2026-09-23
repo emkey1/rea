@@ -1,0 +1,38 @@
+// A top-level statement stays in the main program even when a routine is
+// declared above it. The parser used to run a post-parse "stray statement"
+// pass that moved a top-level statement into the nearest routine declared
+// before it whenever the statement named something other than a global --
+// including a local the statement declares itself -- and moved any statement
+// sharing a line with a routine into that routine. The moved code never ran:
+// an `if` or `while` whose block declares a local disappeared into the
+// constructor below, and the while shape printed nothing at all.
+// No .err golden, so stderr must be empty: each block declares its own name.
+
+class Node {
+  int v;
+  Node(int x) { my.v = x; }
+}
+
+int i = 0;
+int total = 0;
+
+// if: the block's own local `a` must not pull the statement into Node.Node.
+if (i < 2) { Node a = new Node(i + 10); total = total + a.v; i = i + 1; }
+writeln(i);
+writeln(total);
+
+// while: the whole loop used to land in Node.Node, ahead of i's initialiser.
+int w = 0;
+while (w < 2) { Node b = new Node(w); writeln(b.v); w = w + 1; }
+writeln(w);
+
+// Any routine did it, not only a constructor: a free function, then a block
+// with a local and a for loop with its own loop variable.
+void noop() { }
+int s = 0;
+if (s == 0) { int k = 7; s = s + k; }
+for (int f = 0; f < 3; f = f + 1) { s = s + 1; }
+writeln(s);
+
+// A statement sharing a line with a routine stays at top level.
+void bump() { total = total + 100; } bump(); writeln(total);
