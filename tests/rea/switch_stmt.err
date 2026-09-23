@@ -33,7 +33,8 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0078    0 HALT
 == End Disassembly: rea/switch_stmt.rea ==
 
-Constants (9):\n  0000: STR   "myself"
+Constants (9):
+  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "x"

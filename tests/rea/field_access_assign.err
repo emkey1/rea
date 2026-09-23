@@ -13,7 +13,8 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0022    0 HALT
 == End Disassembly: rea/field_access_assign.rea ==
 
-Constants (6):\n  0000: STR   "myself"
+Constants (6):
+  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "p"

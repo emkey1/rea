@@ -28,10 +28,10 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0052    | GET_LOCAL           0 (slot)
 0054    | CALL_USER_PROC       9 'base.speak' @0025 (1 args)
 0058    | RETURN
-0059    0 CONSTANT           10 'Value type ARRAY'
+0059    0 CONSTANT           10 'array[0..2] of INTEGER = (19, 52, 40)'
 0061    | DEFINE_GLOBAL_SLOT Slot:2   'child_vtable' Type:ARRAY Dims:1 [0..2] of INTEGER ('integer')
 0073    | SET_GSLOT           2 'child_vtable'
-0076    | CONSTANT           15 'Value type ARRAY'
+0076    | CONSTANT           15 'array[0..1] of INTEGER = (19, 25)'
 0078    | DEFINE_GLOBAL_SLOT Slot:3   'base_vtable' Type:ARRAY Dims:1 [0..1] of INTEGER ('integer')
 0090    | SET_GSLOT           3 'base_vtable'
 0093    3 ALLOC_OBJECT        3 (fields)
@@ -62,7 +62,8 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0140    0 HALT
 == End Disassembly: rea/super_method.rea ==
 
-Constants (19):\n  0000: STR   "myself"
+Constants (19):
+  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "c"
@@ -72,12 +73,12 @@ Constants (19):\n  0000: STR   "myself"
   0007: STR   "write"
   0008: STR   "base.base"
   0009: STR   "base.speak"
-  0010: Value type ARRAY
+  0010: ARRAY array[0..2] of INTEGER = (19, 52, 40)
   0011: STR   "child_vtable"
   0012: INT   0
   0013: INT   2
   0014: STR   "integer"
-  0015: Value type ARRAY
+  0015: ARRAY array[0..1] of INTEGER = (19, 25)
   0016: STR   "base_vtable"
   0017: STR   "__pscal_anon_pointer"
   0018: STR   "child.child"

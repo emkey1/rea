@@ -24,20 +24,21 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0041    | SET_INDIRECT
 0042    | SET_LOCAL           1 (slot)
 0044    2 RETURN
-0045    0 CONSTANT            6 'Value type ARRAY'
+0045    0 CONSTANT            6 'array[0..0] of INTEGER = (13)'
 0047    | DEFINE_GLOBAL_SLOT Slot:1   'mixedcase_vtable' Type:ARRAY Dims:1 [0..0] of INTEGER ('integer')
 0059    | SET_GSLOT           1 'mixedcase_vtable'
 0062    5 CALL_USER_PROC       9 'run' @0019 (0 args)
 0066    0 HALT
 == End Disassembly: rea/new_local_vtable.rea ==
 
-Constants (10):\n  0000: STR   "myself"
+Constants (10):
+  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "MixedCase"
   0004: STR   "mixedcase_vtable"
   0005: STR   "__pscal_anon_pointer"
-  0006: Value type ARRAY
+  0006: ARRAY array[0..0] of INTEGER = (13)
   0007: INT   0
   0008: STR   "integer"
   0009: STR   "run"

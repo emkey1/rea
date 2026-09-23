@@ -28,7 +28,7 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0051    | SET_INDIRECT
 0052    | DUP
 0053    | GET_FIELD_OFFSET    1 (index)
-0055    | CONSTANT            7 'Value type INT64'
+0055    | CONSTANT            7 '0'
 0057    | SET_INDIRECT
 0058    | DUP
 0059    | GET_FIELD_OFFSET    0 (index)
@@ -45,14 +45,15 @@ Offset Line Opcode           Operand  Value / Target (Args)
 0088    0 HALT
 == End Disassembly: rea/super_constructor.rea ==
 
-Constants (12):\n  0000: STR   "myself"
+Constants (12):
+  0000: STR   "myself"
   0001: NIL
   0002: STR   ""
   0003: STR   "c"
   0004: STR   "Child"
   0005: STR   "base.base"
   0006: STR   "__pscal_anon_pointer"
-  0007: Value type INT64
+  0007: INT64 0
   0008: INT   42
   0009: STR   "child.child"
   0010: INT   1
