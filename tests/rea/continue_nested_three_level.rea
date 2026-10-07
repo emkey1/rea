@@ -1,0 +1,16 @@
+// Three nested for loops, with a continue at the innermost and the middle
+// level: each continue advances only its own loop.
+int total = 0;
+int middle = 0;
+for (int i = 0; i < 4; i = i + 1) {
+  for (int j = 0; j < 5; j = j + 1) {
+    if (j == 4) { continue; }
+    middle = middle + 1;
+    for (int k = 0; k < 4; k = k + 1) {
+      if (k == j) { continue; }
+      total = total + 1;
+    }
+  }
+}
+writeln(total);
+writeln(middle);

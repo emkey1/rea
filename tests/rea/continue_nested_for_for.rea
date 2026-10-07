@@ -1,0 +1,14 @@
+// A continue in an inner for runs only the inner loop's post step. It used to
+// run the enclosing for's post step too, so the outer counter skipped values:
+// the 8-neighbour scan around the centre of a 3x3 grid counted 2, not 8.
+int count = 0;
+int rows = 0;
+for (int dr = -1; dr <= 1; dr = dr + 1) {
+  rows = rows + 1;
+  for (int dc = -1; dc <= 1; dc = dc + 1) {
+    if ((dr == 0) && (dc == 0)) { continue; }
+    count = count + 1;
+  }
+}
+writeln(count);
+writeln(rows);

@@ -1,0 +1,12 @@
+// A switch is not a loop: a continue inside a switch inside a for still runs
+// the for's post step, so the loop advances instead of spinning.
+int seen = 0;
+for (int i = 0; i < 6; i = i + 1) {
+  switch (i % 3) {
+    case 0:
+      continue;
+    default:
+      seen = seen + 1;
+  }
+}
+writeln(seen);

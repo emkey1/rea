@@ -487,6 +487,23 @@ static AST *parseGenericParameterList(ReaParser *p) {
 // Helper to rewrite 'continue' statements to 'post; continue' inside for-loop bodies
 static AST *rewriteContinueWithPost(AST *node, AST *postStmt) {
     if (!node) return NULL;
+    // A continue inside a nested loop belongs to that loop, not to this one.
+    // Inner loops are parsed (and an inner `for` lowered to a WHILE, its own
+    // continues already given its own post step) before the enclosing `for`
+    // rewrites its body, so descending into one would also run the enclosing
+    // loop's post step on every inner continue: the outer counter skipped
+    // values or ran past its bound. switch (AST_CASE / AST_CASE_BRANCH) is
+    // not a loop, so a continue inside a switch inside a for is still
+    // rewritten.
+    switch (node->type) {
+        case AST_WHILE:
+        case AST_REPEAT:
+        case AST_FOR_TO:
+        case AST_FOR_DOWNTO:
+            return node;
+        default:
+            break;
+    }
     if (node->type == AST_CONTINUE) {
         AST *comp = newASTNode(AST_COMPOUND, NULL);
         addChild(comp, copyAST(postStmt));
