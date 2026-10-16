@@ -209,13 +209,17 @@ static void reportReaLineError(int line, const char *fmt, ...) {
 }
 
 /* "identifier 'x' not in scope.", then the front end's repair hint for that
- * name, if it has one. */
+ * name, if it has one. An empty hint means the front end has already reported
+ * this name with a better diagnostic: print nothing (the caller still counts
+ * the error, so the compile fails). */
 static void reportReaNotInScope(int line, const char *ident) {
-    const char *hint;
+    const char *hint = reaFrontendUnknownIdentifierHint(ident);
 
+    if (hint && !*hint) {
+        return;
+    }
     reportReaLineError(line, "identifier '%s' not in scope.", ident);
-    hint = reaFrontendUnknownIdentifierHint(ident);
-    if (hint && *hint) {
+    if (hint) {
         fprintf(stderr, "hint: %s\n", hint);
     }
 }

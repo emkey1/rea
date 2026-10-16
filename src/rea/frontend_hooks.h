@@ -40,7 +40,9 @@ typedef struct ReaFrontendHooks {
     void (*setVerboseCompatibilityDiagnostics)(int enable);
     int (*getVerboseCompatibilityDiagnostics)(void);
     /* A repair hint for an identifier the engine reports as not in scope
-     * (e.g. a likely misspelling of a builtin), or NULL for none. */
+     * (e.g. a likely misspelling of a builtin), or NULL for none. "" means
+     * the front end already reported this name: the engine prints nothing
+     * but still counts the error. */
     const char *(*unknownIdentifierHint)(const char *ident);
 } ReaFrontendHooks;
 
