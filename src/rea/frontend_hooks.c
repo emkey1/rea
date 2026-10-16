@@ -104,6 +104,13 @@ int reaFrontendGetVerboseCompatibilityDiagnostics(void) {
     return 0;
 }
 
+const char *reaFrontendUnknownIdentifierHint(const char *ident) {
+    if (g_rea_frontend_hooks.unknownIdentifierHint && ident) {
+        return g_rea_frontend_hooks.unknownIdentifierHint(ident);
+    }
+    return NULL;
+}
+
 static int g_rea_parsing_library_file = 0;
 
 void reaFrontendSetParsingLibraryFile(int isLibraryFile) {

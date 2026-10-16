@@ -208,6 +208,18 @@ static void reportReaLineError(int line, const char *fmt, ...) {
     fprintf(stderr, "\n");
 }
 
+/* "identifier 'x' not in scope.", then the front end's repair hint for that
+ * name, if it has one. */
+static void reportReaNotInScope(int line, const char *ident) {
+    const char *hint;
+
+    reportReaLineError(line, "identifier '%s' not in scope.", ident);
+    hint = reaFrontendUnknownIdentifierHint(ident);
+    if (hint && *hint) {
+        fprintf(stderr, "hint: %s\n", hint);
+    }
+}
+
 static void reportReaLineWarning(int line, const char *fmt, ...) {
     va_list args;
     int displayLine = line;
@@ -3773,9 +3785,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                        "ambiguous reference to '%s'.",
                                        ident);
                 } else {
-                    reportReaLineError(node->token->line,
-                                       "identifier '%s' not in scope.",
-                                       ident);
+                    reportReaNotInScope(node->token->line, ident);
                 }
                 pascal_semantic_error_count++;
             }
@@ -3827,9 +3837,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                                                    "ambiguous reference to '%s'.",
                                                    ident);
                             } else {
-                                reportReaLineError(node->token->line,
-                                                   "identifier '%s' not in scope.",
-                                                   ident);
+                                reportReaNotInScope(node->token->line, ident);
                             }
                             pascal_semantic_error_count++;
                         }
@@ -4029,9 +4037,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                     if (decl_line > 0 && decl_line > node->token->line) {
                         Symbol *global = lookupGlobalSymbol(node->token->value);
                         if (!global) {
-                            reportReaLineError(node->token->line,
-                                               "identifier '%s' not in scope.",
-                                               node->token->value);
+                            reportReaNotInScope(node->token->line, node->token->value);
                             pascal_semantic_error_count++;
                         }
                     }
@@ -4047,9 +4053,7 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                     if (decl_scope && use_scope && decl_scope == use_scope) {
                         int decl_line = declarationLine(nested);
                         if (decl_line > 0 && decl_line > node->token->line) {
-                            reportReaLineError(node->token->line,
-                                               "identifier '%s' not in scope.",
-                                               node->token->value);
+                            reportReaNotInScope(node->token->line, node->token->value);
                             pascal_semantic_error_count++;
                         }
                     }
@@ -4111,14 +4115,10 @@ static void validateNodeInternal(AST *node, ClassInfo *currentClass) {
                     pascal_semantic_error_count++;
                 }
             } else if (!isBuiltin(node->token->value) && proc_sym && proc_sym->is_defined) {
-                reportReaLineError(node->token->line,
-                                   "identifier '%s' not in scope.",
-                                   node->token->value);
+                reportReaNotInScope(node->token->line, node->token->value);
                 pascal_semantic_error_count++;
             } else if (!isBuiltin(node->token->value) && (!proc_sym || !proc_sym->is_defined)) {
-                reportReaLineError(node->token->line,
-                                   "identifier '%s' not in scope.",
-                                   node->token->value);
+                reportReaNotInScope(node->token->line, node->token->value);
                 pascal_semantic_error_count++;
             }
         }

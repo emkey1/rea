@@ -39,6 +39,9 @@ typedef struct ReaFrontendHooks {
     char *(*rewriteSource)(const char *source, const char *path);
     void (*setVerboseCompatibilityDiagnostics)(int enable);
     int (*getVerboseCompatibilityDiagnostics)(void);
+    /* A repair hint for an identifier the engine reports as not in scope
+     * (e.g. a likely misspelling of a builtin), or NULL for none. */
+    const char *(*unknownIdentifierHint)(const char *ident);
 } ReaFrontendHooks;
 
 /* Install the active front end's hooks. Passing NULL clears them. */
@@ -62,6 +65,7 @@ const char *reaFrontendInferDiagnosticCode(const char *kind, const char *detail)
 char *reaFrontendRewriteSource(const char *source, const char *path);
 void reaFrontendSetVerboseCompatibilityDiagnostics(int enable);
 int reaFrontendGetVerboseCompatibilityDiagnostics(void);
+const char *reaFrontendUnknownIdentifierHint(const char *ident);
 
 /* Transient parse-time state (not a hook override): true for the duration of
  * a reaFrontendParseSource() call made on behalf of loadModuleRecursive()
