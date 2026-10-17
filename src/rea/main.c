@@ -311,14 +311,33 @@ static void toonWriteEscaped(FILE *out, const char *text) {
 static void inferDiagnosticPhaseKind(const char *message, char **outPhase, char **outKind) {
     const char *phase = "compile";
     const char *kind = "generic";
+    char labelBuf[48];
 
     if (message) {
         if (strstr(message, "parser error")) {
+            /* Aether writes "Aether <kind> parser error: ..." (plain
+             * "Aether parser error:" for kind parser), so the label is the kind,
+             * lowercased (`TOON` -> `toon`). The old substring tests matched
+             * "par" inside "parser" itself, so nearly every parser diagnostic
+             * was kind "par", and "declaration" anywhere in the detail won. */
             phase = "parser";
-            if (strstr(message, "declaration")) kind = "declaration";
-            else if (strstr(message, "TOON")) kind = "toon";
-            else if (strstr(message, "par")) kind = "par";
-            else kind = "parser";
+            kind = "parser";
+            const char *aether = strstr(message, "Aether ");
+            const char *pe = strstr(message, " parser error");
+            if (aether && pe && pe > aether + 7) {
+                const char *s = aether + 7;
+                size_t n = (size_t)(pe - s);
+                bool ok = n < sizeof(labelBuf);
+                for (size_t i = 0; ok && i < n; i++) {
+                    unsigned char c = (unsigned char)s[i];
+                    if (!(isalnum(c) || c == '-' || c == '_')) ok = false;
+                    else labelBuf[i] = (char)tolower(c);
+                }
+                if (ok) {
+                    labelBuf[n] = '\0';
+                    kind = labelBuf;
+                }
+            }
         } else if (strstr(message, "Aether contract error")) {
             phase = "semantic";
             kind = "contract";
