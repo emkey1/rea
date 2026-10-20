@@ -1,0 +1,38 @@
+// Objects created in a loop from a class chain share one cached field layout
+// (pscal-core RecordTypeLayout, 2026-10-20): each `new` fills in the
+// inherited fields and the hidden vtable slot exactly as building the layout
+// from the type every time did, and a store into an inherited Real field
+// through the object still converts an Int (the field's declared type is
+// looked up from the class, not from the value).
+class Shape {
+  str name;
+  double area;
+  int hits;
+  void Shape(str n) { myself.name = n; }
+  double size() { return myself.area; }
+  void bump() { myself.hits = myself.hits + 1; }
+}
+class Circle extends Shape {
+  double r;
+  void Circle(double rr) { super("circle"); myself.r = rr; myself.area = 3 * rr * rr; }
+  double size() { return myself.r * 2; }
+}
+class Sq extends Shape {
+  int edge;
+  void Sq(int e) { super("sq"); myself.edge = e; myself.area = e * e; }
+}
+double total = 0;
+int i = 0;
+Shape last = nil;
+while (i < 2000) {
+  Shape s;
+  if (i % 2 == 0) { s = new Circle(i); } else { s = new Sq(i); }
+  s.bump();
+  s.area = i;          // Int into an inherited Real field
+  total = total + s.size() + s.area;
+  if (i % 500 == 0 || i % 500 == 1) { writeln(s.name, " ", s.size(), " ", s.area, " ", s.hits); }
+  last = s;
+  i = i + 1;
+}
+writeln(total);
+writeln(last.name, " ", last.hits, " ", last.area);
