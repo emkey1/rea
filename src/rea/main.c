@@ -901,8 +901,20 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             printf("%s", REA_USAGE);
             REA_RETURN(vmExitWithCleanup(EXIT_SUCCESS));
         } else if (strcmp(argv[argi], "-v") == 0 || strcmp(argv[argi], "--version") == 0) {
+#ifdef PSCAL_RELEASE_LABEL
+            /* A front end with a release label (Aether's RELEASE file, D75)
+             * prints it after the date version, which stays the first token
+             * after "Version:" for tools: "2026-10-20-11 (1.0-beta1)". */
+            if (strcmp(pscal_git_tag_string(), "untagged") == 0)
+                printf(PSCAL_FRONTEND_DISPLAY_NAME " Compiler Version: %s (%s)\n",
+                       pscal_program_version_string(), PSCAL_RELEASE_LABEL);
+            else
+                printf(PSCAL_FRONTEND_DISPLAY_NAME " Compiler Version: %s (%s, latest tag: %s)\n",
+                       pscal_program_version_string(), PSCAL_RELEASE_LABEL, pscal_git_tag_string());
+#else
             printf(PSCAL_FRONTEND_DISPLAY_NAME " Compiler Version: %s (latest tag: %s)\n",
                    pscal_program_version_string(), pscal_git_tag_string());
+#endif
             REA_RETURN(vmExitWithCleanup(EXIT_SUCCESS));
         } else if (strcmp(argv[argi], "--dump-ast-json") == 0) {
             dump_ast_json = 1;
