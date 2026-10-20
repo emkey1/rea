@@ -1148,6 +1148,11 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         }
 #undef PSCAL_STAT_SEC
     }
+    /* A cache miss re-initialises the chunk (the loader's failure paths and
+     * the stale-import reset above), which drops the source path set before
+     * the lookup: a cold run then compiled a chunk with no path, and its
+     * run-time errors lost their "file:line:" prefix. */
+    if (!used_cache) setBytecodeChunkSourcePath(&chunk, path);
     if (verbose_flag && !no_cache && !used_cache) {
         fprintf(stderr, "Cache miss: %s\n", cache_miss_reason ? cache_miss_reason : pscalCacheLastLoadError());
     }
