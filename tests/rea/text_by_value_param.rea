@@ -1,0 +1,22 @@
+// A by-value text parameter shares the caller's file; freeing it on return
+// must not close or free the caller's handle.
+text f;
+void put(text t, str msg) {
+  writeln(t, msg);
+}
+str name = "tbvp_out.txt";
+assign(f, name);
+rewrite(f);
+put(f, "alpha");
+put(f, "beta");
+writeln(f, "gamma");
+close(f);
+reset(f);
+str s;
+while (!eof(f)) {
+  readln(f, s);
+  writeln("got ", s);
+}
+close(f);
+erase(f);
+writeln("done");

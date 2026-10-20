@@ -1,0 +1,6 @@
+int big = 5000000000;
+printf("%d|%x\n", big, big);
+str s = "0123456789";
+int k = 0;
+while (k < 5) { s = s + s; k = k + 1; }
+printf("%d [%s]\n", length(s), s);

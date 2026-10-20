@@ -1,0 +1,12 @@
+// spawn passes every argument: only the first 8 used to reach the thread,
+// which failed with "Local slot index out of range".
+void worker(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j) {
+  writeln("child ", a, " ", h, " ", i, " ", j);
+}
+
+int main() {
+  int tid = spawn worker(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  join tid;
+  writeln("end");
+  return 0;
+}

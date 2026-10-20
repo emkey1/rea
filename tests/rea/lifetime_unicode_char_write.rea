@@ -1,0 +1,27 @@
+// Writing a character into a str (UnicodeString) re-encodes it as UTF-8 and
+// replaces the whole character at that code point index, whatever the byte
+// lengths of the old and new characters.
+str s = "héllo";
+s[3] = 'X';
+writeln(s);
+writeln(length(s));
+str r = "abc";
+r[1] = 'é';
+writeln(r);
+writeln(length(r));
+str m = "añb€c";
+m[1] = 'é';
+m[2] = 'x';
+m[4] = 'y';
+m[5] = '€';
+writeln(m);
+writeln(length(m));
+str t = "abc";
+t[3] = 'ñ';
+t[1] = "€";
+writeln(t);
+writeln(length(t));
+int i = 1;
+str u = "€€€";
+while (i <= 3) { u[i] = 'z'; i = i + 1; }
+writeln(u);

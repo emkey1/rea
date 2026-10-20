@@ -1,0 +1,32 @@
+// One thread keeps storing a fresh string into a global while another reads
+// it. The store must install the new value through the locked cell swap; a
+// free-then-rebuild in place let the reader retain a string just freed.
+int counter = 0;
+str msg = "start";
+
+void writer() {
+  int i;
+  for (i = 0; i < 50000; i = i + 1) {
+    counter = i;
+    msg = "value-" + "x";
+    msg = 'c';
+  }
+  msg = "value-x";
+}
+
+void reader() {
+  int i;
+  int n = 0;
+  for (i = 0; i < 50000; i = i + 1) {
+    n = n + length(msg);
+  }
+  writeln("reader done");
+}
+
+int t1;
+int t2;
+t1 = spawn writer();
+t2 = spawn reader();
+join t1;
+join t2;
+writeln(msg);

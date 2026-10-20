@@ -1,0 +1,15 @@
+int i = 0;
+while (i < 3) {
+  str s;
+  int n;
+  writeln("s=[", s, "] n=", n);
+  s = s + "x";
+  n = n + 5;
+  i = i + 1;
+}
+int k;
+for (k = 0; k < 3; k = k + 1) {
+  int x;
+  writeln("x=", x);
+  x = x + 10;
+}
