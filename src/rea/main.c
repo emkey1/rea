@@ -134,6 +134,7 @@ static const char *REA_USAGE =
     "     --no-run               Compile but skip VM execution.\n"
     "     --dump-ext-builtins    List extended builtin inventory and exit.\n"
     "     --no-cache             Compile fresh; neither read nor write cached bytecode.\n"
+    "     --prune-cache          Remove cached bytecode whose source file is gone, then exit.\n"
     "     --verbose              Print compilation/cache status messages.\n"
 #if PSCAL_FRONTEND_KIND == FRONTEND_KIND_AETHER
     "     --verbose-compat       Print Aether compatibility warnings such as ignored missing imports.\n"
@@ -874,6 +875,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     int dump_ext_builtins = 0;
     int vm_trace_head = 0;
     int no_cache = 0;
+    int prune_cache = 0;
 #ifdef PSCAL_TARGET_IOS
     /* Cached bytecode compiled by a different app binary can drift out of sync
      * on iOS because tools run in-process. Default to fresh compiles unless the
@@ -931,6 +933,8 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             no_run_flag = 1;
         } else if (strcmp(argv[argi], "--dump-ext-builtins") == 0) {
             dump_ext_builtins = 1;
+        } else if (strcmp(argv[argi], "--prune-cache") == 0) {
+            prune_cache = 1;
         } else if (strcmp(argv[argi], "--no-cache") == 0) {
             no_cache = 1;
         } else if (strcmp(argv[argi], "--verbose") == 0) {
@@ -969,6 +973,10 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         registerExtendedBuiltins();
         extBuiltinDumpInventory(stdout);
         REA_RETURN(vmExitWithCleanup(EXIT_SUCCESS));
+    }
+
+    if (prune_cache) {
+        REA_RETURN(vmExitWithCleanup(pruneBytecodeCache(stdout, verbose_flag)));
     }
 
     if (argc <= argi) {

@@ -347,4 +347,5 @@ bytecode disassembly.
 
   The Rea front end caches compiled chunks under `~/.pscal/bc_cache`. Use `--no-cache`
   during iteration (it neither reads nor writes the cache) or delete the cache
-  directory to force a fresh compile.
+  directory to force a fresh compile. `--prune-cache` removes the entries whose
+  source file no longer exists.

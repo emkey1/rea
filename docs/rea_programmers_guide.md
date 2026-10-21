@@ -56,6 +56,7 @@ Files in `Examples/rea` are executable scripts with a `#!/usr/bin/env rea` sheba
 - `--no-run` – compile without running to perform static analysis or bytecode inspection.
 - `--vm-trace-head=N` – trace the first `N` VM instructions.
 - `--no-cache` – compile fresh; neither read nor write the bytecode cache in `~/.pscal/bc_cache`.
+- `--prune-cache` – remove the cache entries whose source file no longer exists, then exit (`--verbose` lists each one).
 - `--strict` – enable stricter top-level parsing.
 
 Inside source files, add `trace on` to enable a short instruction trace without CLI options. Combine these tools to isolate compiler and runtime issues quickly.
@@ -428,6 +429,7 @@ Before cutting a release candidate:
 - `--dump-ext-builtins` – dump extended builtin inventory.
 - `--vm-trace-head=N` – trace the first `N` VM instructions.
 - `--no-cache` – neither read nor write `~/.pscal/bc_cache`.
+- `--prune-cache` – remove cache entries whose source file is gone, then exit.
 - `--strict` – enable stricter top-level parsing.
 - `--no-run` – compile the program without launching the VM.
 
