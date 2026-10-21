@@ -489,6 +489,43 @@ static int parseRuntimeLocationLine(const char *line, RuntimeLocationInfo *info)
     return 0;
 }
 
+/* A `hint: ...` or `help: see <CODE> ...` line continues the diagnostic before
+ * it: the hint replaces that entry's hint, and the help pointer is appended to
+ * it after a "; " (a stray pointer with no entry before it is dropped). Returns
+ * 1 when `line` was such a line, so the caller makes no entry of its own: as an
+ * entry it was a junk record with code null and kind generic. */
+static int foldDiagnosticContinuation(ParsedDiagnostic *items, int count, const char *line) {
+    if (strncmp(line, "hint: ", 6) == 0) {
+        if (count > 0) {
+            free(items[count - 1].hint);
+            items[count - 1].hint = diagDupRange(line + 6, line + strlen(line));
+            return 1;
+        }
+        return 0;
+    }
+    if (strncmp(line, "help: ", 6) != 0) return 0;
+    if (count > 0) {
+        const char *text = line + 6;
+        ParsedDiagnostic *prev = &items[count - 1];
+        if (!prev->hint) {
+            prev->hint = diagDupRange(text, text + strlen(text));
+        } else {
+            size_t hintLen = strlen(prev->hint);
+            size_t textLen = strlen(text);
+            char *merged = (char *)malloc(hintLen + 2 + textLen + 1);
+            if (merged) {
+                memcpy(merged, prev->hint, hintLen);
+                merged[hintLen] = ';';
+                merged[hintLen + 1] = ' ';
+                memcpy(merged + hintLen + 2, text, textLen + 1);
+                free(prev->hint);
+                prev->hint = merged;
+            }
+        }
+    }
+    return 1;
+}
+
 static ParsedDiagnostic *collectDiagnosticsFromText(const char *text, int *outCount) {
     ParsedDiagnostic *items = NULL;
     int count = 0;
@@ -506,36 +543,10 @@ static ParsedDiagnostic *collectDiagnosticsFromText(const char *text, int *outCo
         lineEnd = trimEnd(lineStart, lineEnd);
         if (lineEnd > lineStart) {
             char *line = diagDupRange(lineStart, lineEnd);
-            if (line && strncmp(line, "hint: ", 6) == 0 && count > 0) {
-                free(items[count - 1].hint);
-                items[count - 1].hint = diagDupRange(line + 6, line + strlen(line));
-                free(line);
-            } else if (line && strncmp(line, "help: ", 6) == 0) {
+            if (line && foldDiagnosticContinuation(items, count, line)) {
                 /* The standalone `help: see <CODE> ...` guide-pointer line that
-                 * follows every coded diagnostic (aetherReportGuideHelp) belongs
-                 * to the PRECEDING diagnostic; fold it in like a hint: line
-                 * (appended after any existing hint) instead of emitting a junk
-                 * entry (code null, kind generic). With no preceding entry the
-                 * stray pointer has nothing to attach to, so it is skipped. */
-                if (count > 0) {
-                    const char *text = line + 6;
-                    ParsedDiagnostic *prev = &items[count - 1];
-                    if (!prev->hint) {
-                        prev->hint = diagDupRange(text, text + strlen(text));
-                    } else {
-                        size_t hintLen = strlen(prev->hint);
-                        size_t textLen = strlen(text);
-                        char *merged = (char *)malloc(hintLen + 2 + textLen + 1);
-                        if (merged) {
-                            memcpy(merged, prev->hint, hintLen);
-                            merged[hintLen] = ';';
-                            merged[hintLen + 1] = ' ';
-                            memcpy(merged + hintLen + 2, text, textLen + 1);
-                            free(prev->hint);
-                            prev->hint = merged;
-                        }
-                    }
-                }
+                 * follows every coded diagnostic (aetherReportGuideHelp), and a
+                 * hint: line, belong to the PRECEDING diagnostic. */
                 free(line);
             } else if (line) {
                 if (count == capacity) {
@@ -590,6 +601,11 @@ static ParsedDiagnostic *collectRuntimeDiagnosticsFromText(const char *text,
                 if (count > 0) {
                     items[count - 1].line = location.line;
                 }
+                free(line);
+            } else if (foldDiagnosticContinuation(items, count, line)) {
+                /* A run-time error's hint: and help: lines (ARR-003, the
+                 * AETH-RUNTIME-* math errors) used to be entries of their own,
+                 * each with code null. */
                 free(line);
             } else {
                 ParsedDiagnostic diag;
