@@ -24,7 +24,7 @@ The `rea` front end supports a few diagnostic options:
 --dump-bytecode        Dump the compiled bytecode before execution.
 --dump-bytecode-only   Dump the compiled bytecode and exit without executing.
 --vm-trace-head=N      Print the first N VM instructions executed (e.g. 64).
---no-cache             Ignore cached bytecode and compile fresh.
+--no-cache             Compile fresh; neither read nor write cached bytecode.
 
 You can also drop a `trace on` comment anywhere in the source to enable a short
 default instruction trace without adding CLI flags. The VM prints lines like

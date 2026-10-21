@@ -133,7 +133,7 @@ static const char *REA_USAGE =
     "     --dump-bytecode-only   Dump compiled bytecode and exit (no execution).\n"
     "     --no-run               Compile but skip VM execution.\n"
     "     --dump-ext-builtins    List extended builtin inventory and exit.\n"
-    "     --no-cache             Compile fresh (ignore cached bytecode).\n"
+    "     --no-cache             Compile fresh; neither read nor write cached bytecode.\n"
     "     --verbose              Print compilation/cache status messages.\n"
 #if PSCAL_FRONTEND_KIND == FRONTEND_KIND_AETHER
     "     --verbose-compat       Print Aether compatibility warnings such as ignored missing imports.\n"
@@ -1184,7 +1184,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         }
         if (compilation_ok) {
             finalizeBytecode(&chunk);
-            saveBytecodeToCache(path, kReaCompilerId, &chunk);
+            if (!no_cache) saveBytecodeToCache(path, kReaCompilerId, &chunk);
             // VM 2.0 Phase 2b (plan §5.7): link AFTER saving to cache, never
             // before -- see compiler.c's compileASTToBytecode() comment.
             // Must also run before the disassembly below.

@@ -55,7 +55,7 @@ Files in `Examples/rea` are executable scripts with a `#!/usr/bin/env rea` sheba
 - `--dump-ext-builtins` – dump extended builtin inventory.
 - `--no-run` – compile without running to perform static analysis or bytecode inspection.
 - `--vm-trace-head=N` – trace the first `N` VM instructions.
-- `--no-cache` – ignore cached `.rea.obj` artifacts in `rea-obj/`.
+- `--no-cache` – compile fresh; neither read nor write the bytecode cache in `~/.pscal/bc_cache`.
 - `--strict` – enable stricter top-level parsing.
 
 Inside source files, add `trace on` to enable a short instruction trace without CLI options. Combine these tools to isolate compiler and runtime issues quickly.
@@ -401,7 +401,7 @@ When touching the implementation in `src/rea`:
 - Review existing globals before adding new ones; many helpers depend on push/pop stacks to restore compiler state.
 - Update both the parser and semantic passes when introducing new syntax.
 - Add regression coverage in `Tests/rea` and the scope harness.
-- Keep `rea-obj/` caches in mind; either delete them or use `--no-cache` during debugging after grammar changes.
+- Keep the bytecode cache (`~/.pscal/bc_cache`) in mind; either delete it or use `--no-cache` during debugging after grammar changes.
 
 ### 10.2 Documenting Language Changes
 
@@ -427,7 +427,7 @@ Before cutting a release candidate:
 - `--dump-bytecode-only` – print bytecode and exit.
 - `--dump-ext-builtins` – dump extended builtin inventory.
 - `--vm-trace-head=N` – trace the first `N` VM instructions.
-- `--no-cache` – ignore `rea-obj/` caches.
+- `--no-cache` – neither read nor write `~/.pscal/bc_cache`.
 - `--strict` – enable stricter top-level parsing.
 - `--no-run` – compile the program without launching the VM.
 
@@ -445,7 +445,7 @@ Before cutting a release candidate:
 - **Parse errors**: Revisit the syntax near the reported line; unterminated modules and missing braces are common when editing large blocks.
 - **Module resolution failures**: Confirm `#import` paths are relative to the importing file and that exported names are unique.
 - **Runtime panics**: Use `--vm-trace-head` and `trace on` to locate the failing bytecode, then inspect the disassembly.
-- **Cache confusion**: Remove `rea-obj/*.obj` or pass `--no-cache` when bytecode appears stale.
+- **Cache confusion**: Remove the program's entry from `~/.pscal/bc_cache` or pass `--no-cache` when bytecode appears stale.
 
 ### D. Glossary
 
