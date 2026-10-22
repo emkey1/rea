@@ -172,6 +172,11 @@ static char *gReaSourcePath = NULL;
 static char **gModuleDirStack = NULL;
 static int gModuleDirDepth = 0;
 static int gModuleDirCapacity = 0;
+/* Aether: the `use` targets that were not found (D82), for the SCOPE-001 hint
+ * on a name one of them would have defined. */
+#define REA_MAX_MISSING_IMPORTS 8
+static char *gMissingImports[REA_MAX_MISSING_IMPORTS];
+static int gMissingImportCount = 0;
 static char *reaDupString(const char *s);
 static char *duplicateDirName(const char *path);
 static char *tryResolveFromRepository(const char *relative, bool *out_exists);
@@ -221,6 +226,12 @@ static void reportReaNotInScope(int line, const char *ident) {
     reportReaLineError(line, "identifier '%s' not in scope.", ident);
     if (hint) {
         fprintf(stderr, "hint: %s\n", hint);
+    } else if (frontendIsAether() && gMissingImportCount > 0) {
+        /* A name from a module whose `use` was not found: the bare "not in
+         * scope" hid that the import itself had failed (D82). */
+        fprintf(stderr, "hint: if '%s' comes from module '%s', that `use` was not found "
+                        "(see the IMP-001 warning above), so none of its names are defined.\n",
+                ident, gMissingImports[0]);
     }
 }
 
@@ -834,7 +845,7 @@ static char *resolveAlternateSupportPath(const char *path, bool *out_exists) {
     return NULL;
 }
 
-static char *resolveModulePath(const char *path, bool *out_exists) {
+static char *resolveModulePathAsGiven(const char *path, bool *out_exists) {
     if (out_exists) *out_exists = false;
     if (!path || !*path) return NULL;
 
@@ -858,6 +869,42 @@ static char *resolveModulePath(const char *path, bool *out_exists) {
     }
 
     return reaDupString(path);
+}
+
+/* True when the last path component has a dot: `use "lib/score_utils.aether"`. */
+static bool modulePathHasExtension(const char *path) {
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+    return strchr(base, '.') != NULL;
+}
+
+/* Aether's `use "score_utils"` also finds `score_utils.aether`, the name a
+ * person or a model gives the file (D82). It used to find only an
+ * extensionless file named exactly `score_utils`; the natural name was a
+ * missing import, ignored without a word. An extensionless file still wins. */
+static char *resolveModulePath(const char *path, bool *out_exists) {
+    bool exists = false;
+    char *resolved = resolveModulePathAsGiven(path, &exists);
+    if (!exists && frontendIsAether() && path && *path && !modulePathHasExtension(path)) {
+        size_t len = strlen(path);
+        char *withExt = (char *)malloc(len + sizeof(".aether"));
+        if (withExt) {
+            memcpy(withExt, path, len);
+            memcpy(withExt + len, ".aether", sizeof(".aether"));
+            bool extExists = false;
+            char *extResolved = resolveModulePathAsGiven(withExt, &extExists);
+            free(withExt);
+            if (extExists) {
+                free(resolved);
+                resolved = extResolved;
+                exists = true;
+            } else {
+                free(extResolved);
+            }
+        }
+    }
+    if (out_exists) *out_exists = exists;
+    return resolved;
 }
 
 static ReaModuleInfo *findModuleByPath(const char *path) {
@@ -1214,10 +1261,23 @@ static void collectImportBindings(AST *decls, ReaModuleBindingList *bindings) {
             ReaModuleInfo *mod = loadModuleRecursive(path);
             if (!mod) {
                 if (frontendIsAether()) {
-                    if (reaFrontendGetVerboseCompatibilityDiagnostics()) {
+                    /* Reported by default since D82: shown only under
+                     * --verbose-compat, the failed import was invisible, and
+                     * its calls failed with a bare SCOPE-001. */
+                    if (modulePathHasExtension(path)) {
                         reportReaLineWarning(line,
-                                             "Aether ignored missing import '%s'.",
+                                             "module '%s' not found beside this file, in the working "
+                                             "directory or on the import path, so its names are not defined.",
                                              path);
+                    } else {
+                        reportReaLineWarning(line,
+                                             "module '%s' not found: looked for '%s' and '%s.aether' beside "
+                                             "this file, in the working directory and on the import path, so "
+                                             "its names are not defined.",
+                                             path, path, path);
+                    }
+                    if (gMissingImportCount < REA_MAX_MISSING_IMPORTS) {
+                        gMissingImports[gMissingImportCount++] = reaDupString(path);
                     }
                 }
                 continue;

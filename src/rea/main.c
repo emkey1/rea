@@ -168,6 +168,7 @@ typedef struct ParsedDiagnostic {
     char *message;
     char *hint;
     char *raw;
+    int is_warning; /* the line read `path:line: warning: ...` */
 } ParsedDiagnostic;
 
 typedef struct RuntimeLocationInfo {
@@ -425,6 +426,18 @@ static void extractDiagnosticCode(ParsedDiagnostic *diag) {
     diag->message = strippedMessage;
 }
 
+/* A `warning: ` after the location is the line's severity, not its message:
+ * left in, the [CODE] after it went unread, so every warning printed before a
+ * compile error (NARROW-001, PARAM-001, IMP-001) was an entry with severity
+ * error and code null. */
+static const char *takeWarningPrefix(const char *message, ParsedDiagnostic *diag) {
+    if (strncmp(message, "warning: ", 9) == 0) {
+        diag->is_warning = 1;
+        return message + 9;
+    }
+    return message;
+}
+
 static ParsedDiagnostic parseDiagnosticLine(const char *line) {
     ParsedDiagnostic diag = {0};
     const char *firstColon;
@@ -443,6 +456,7 @@ static ParsedDiagnostic parseDiagnosticLine(const char *line) {
             if (endptr == secondColon) {
                 const char *message = secondColon + 1;
                 while (*message == ' ') message++;
+                message = takeWarningPrefix(message, &diag);
                 diag.file = diagDupRange(line, firstColon);
                 diag.line = (int)parsedLine;
                 diag.message = diagDupRange(message, message + strlen(message));
@@ -456,7 +470,7 @@ static ParsedDiagnostic parseDiagnosticLine(const char *line) {
     if (line[0] == 'L' && isdigit((unsigned char)line[1])) {
         long parsedLine = strtol(line + 1, &endptr, 10);
         if (endptr && endptr[0] == ':' && endptr[1] == ' ') {
-            const char *message = endptr + 2;
+            const char *message = takeWarningPrefix(endptr + 2, &diag);
             diag.line = (int)parsedLine;
             diag.message = diagDupRange(message, message + strlen(message));
             extractDiagnosticCode(&diag);
@@ -643,7 +657,7 @@ static void emitDiagnosticsJson(FILE *out, ParsedDiagnostic *items, int count) {
     fputs("[\n", out);
     for (int i = 0; i < count; i++) {
         ParsedDiagnostic *diag = &items[i];
-        fputs("  {\"severity\":\"error\"", out);
+        fputs(diag->is_warning ? "  {\"severity\":\"warning\"" : "  {\"severity\":\"error\"", out);
         fputs(",\"phase\":", out);
         jsonWriteEscaped(out, diag->phase ? diag->phase : "compile");
         fputs(",\"kind\":", out);
@@ -684,7 +698,7 @@ static void emitDiagnosticsToon(FILE *out, ParsedDiagnostic *items, int count) {
     for (int i = 0; i < count; i++) {
         ParsedDiagnostic *diag = &items[i];
         fputs("  \"", out);
-        toonWriteEscaped(out, "error");
+        toonWriteEscaped(out, diag->is_warning ? "warning" : "error");
         fputs("\",\"", out);
         toonWriteEscaped(out, diag->phase ? diag->phase : "compile");
         fputs("\",\"", out);
