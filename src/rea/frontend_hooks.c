@@ -111,6 +111,10 @@ const char *reaFrontendUnknownIdentifierHint(const char *ident) {
     return NULL;
 }
 
+const char *reaFrontendSwapReportPath(const char *path) {
+    return g_rea_frontend_hooks.swapReportPath ? g_rea_frontend_hooks.swapReportPath(path) : NULL;
+}
+
 static int g_rea_parsing_library_file = 0;
 
 void reaFrontendSetParsingLibraryFile(int isLibraryFile) {

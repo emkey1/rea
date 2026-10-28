@@ -44,6 +44,11 @@ typedef struct ReaFrontendHooks {
      * the front end already reported this name: the engine prints nothing
      * but still counts the error. */
     const char *(*unknownIdentifierHint)(const char *ident);
+    /* Set the file name the front end reports diagnostics under and return the
+     * previous one. loadModuleRecursive() sets a module's path while it parses
+     * that module, so a syntax error in it names the module's file, not the
+     * file that imported it. */
+    const char *(*swapReportPath)(const char *path);
 } ReaFrontendHooks;
 
 /* Install the active front end's hooks. Passing NULL clears them. */
@@ -68,6 +73,8 @@ char *reaFrontendRewriteSource(const char *source, const char *path);
 void reaFrontendSetVerboseCompatibilityDiagnostics(int enable);
 int reaFrontendGetVerboseCompatibilityDiagnostics(void);
 const char *reaFrontendUnknownIdentifierHint(const char *ident);
+/* NULL, and no effect, when the front end has no report path. */
+const char *reaFrontendSwapReportPath(const char *path);
 
 /* Transient parse-time state (not a hook override): true for the duration of
  * a reaFrontendParseSource() call made on behalf of loadModuleRecursive()

@@ -176,7 +176,16 @@ static int gModuleDirCapacity = 0;
  * on a name one of them would have defined. */
 #define REA_MAX_MISSING_IMPORTS 8
 static char *gMissingImports[REA_MAX_MISSING_IMPORTS];
+static bool gMissingImportBroken[REA_MAX_MISSING_IMPORTS];
 static int gMissingImportCount = 0;
+/* Why the last loadModuleRecursive() returned NULL: its file was missing, or
+ * it was found and did not compile (Aether words the two apart). */
+static bool gModuleLoadBroken = false;
+/* The `use` being resolved: its line, and the module file it is written in
+ * (NULL while the program's own file is read). Aether's import diagnostics
+ * name that file. */
+static int gImportLine = 0;
+static const char *gImportingModulePath = NULL;
 static char *reaDupString(const char *s);
 static char *duplicateDirName(const char *path);
 static char *tryResolveFromRepository(const char *relative, bool *out_exists);
@@ -201,7 +210,9 @@ static void reportReaLineError(int line, const char *fmt, ...) {
         code = reaFrontendInferDiagnosticCode(NULL, message);
     }
 
-    if (gReaSourcePath && *gReaSourcePath) {
+    if (frontendIsAether() && gImportingModulePath) {
+        fprintf(stderr, "%s:%d: ", gImportingModulePath, line);
+    } else if (gReaSourcePath && *gReaSourcePath) {
         fprintf(stderr, "%s:%d: ", gReaSourcePath, displayLine);
     } else {
         fprintf(stderr, "L%d: ", displayLine);
@@ -229,9 +240,15 @@ static void reportReaNotInScope(int line, const char *ident) {
     } else if (frontendIsAether() && gMissingImportCount > 0) {
         /* A name from a module whose `use` was not found: the bare "not in
          * scope" hid that the import itself had failed (D82). */
-        fprintf(stderr, "hint: if '%s' comes from module '%s', that `use` was not found "
-                        "(see the IMP-001 warning above), so none of its names are defined.\n",
-                ident, gMissingImports[0]);
+        if (gMissingImportBroken[0]) {
+            fprintf(stderr, "hint: if '%s' comes from module '%s', that module did not compile "
+                            "(see its errors above), so none of its names are defined.\n",
+                    ident, gMissingImports[0]);
+        } else {
+            fprintf(stderr, "hint: if '%s' comes from module '%s', that `use` was not found "
+                            "(see the IMP-001 warning above), so none of its names are defined.\n",
+                    ident, gMissingImports[0]);
+        }
     }
 }
 
@@ -253,7 +270,9 @@ static void reportReaLineWarning(int line, const char *fmt, ...) {
         code = reaFrontendInferDiagnosticCode("compatibility", message);
     }
 
-    if (gReaSourcePath && *gReaSourcePath) {
+    if (frontendIsAether() && gImportingModulePath) {
+        fprintf(stderr, "%s:%d: warning: ", gImportingModulePath, line);
+    } else if (gReaSourcePath && *gReaSourcePath) {
         fprintf(stderr, "%s:%d: warning: ", gReaSourcePath, displayLine);
     } else {
         fprintf(stderr, "L%d: warning: ", displayLine);
@@ -1258,13 +1277,19 @@ static void collectImportBindings(AST *decls, ReaModuleBindingList *bindings) {
             sawExplicitImports = true;
             const char *path = importNode->token->value;
             int line = importNode->token ? importNode->token->line : 0;
+            gImportLine = line;
             ReaModuleInfo *mod = loadModuleRecursive(path);
             if (!mod) {
                 if (frontendIsAether()) {
                     /* Reported by default since D82: shown only under
                      * --verbose-compat, the failed import was invisible, and
                      * its calls failed with a bare SCOPE-001. */
-                    if (modulePathHasExtension(path)) {
+                    if (gModuleLoadBroken) {
+                        reportReaLineWarning(line,
+                                             "module '%s' was found but did not compile, so its names "
+                                             "are not defined: fix the errors reported for its file above.",
+                                             path);
+                    } else if (modulePathHasExtension(path)) {
                         reportReaLineWarning(line,
                                              "module '%s' not found beside this file, in the working "
                                              "directory or on the import path, so its names are not defined.",
@@ -1277,6 +1302,7 @@ static void collectImportBindings(AST *decls, ReaModuleBindingList *bindings) {
                                              path, path, path);
                     }
                     if (gMissingImportCount < REA_MAX_MISSING_IMPORTS) {
+                        gMissingImportBroken[gMissingImportCount] = gModuleLoadBroken;
                         gMissingImports[gMissingImportCount++] = reaDupString(path);
                     }
                 }
@@ -1312,6 +1338,7 @@ static void collectImportBindings(AST *decls, ReaModuleBindingList *bindings) {
 static ReaModuleInfo *loadModuleRecursive(const char *path) {
     if (!path) return NULL;
 
+    gModuleLoadBroken = false;
     bool pathExists = false;
     char *resolved = resolveModulePath(path, &pathExists);
     if (!resolved) {
@@ -1324,7 +1351,14 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
     if (existing) {
         free(resolved);
         if (existing->in_progress) {
-            fprintf(stderr, "Cyclic module dependency detected involving '%s'.\n", existing->path ? existing->path : path);
+            if (frontendIsAether()) {
+                reportReaLineError(gImportLine,
+                                   "module '%s' uses itself, directly or through another module: a "
+                                   "module cannot `use` a module that uses it.",
+                                   path);
+            } else {
+                fprintf(stderr, "Cyclic module dependency detected involving '%s'.\n", existing->path ? existing->path : path);
+            }
             pascal_semantic_error_count++;
         }
         return existing;
@@ -1339,9 +1373,12 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
 
     int was_parsing_library = reaFrontendIsParsingLibraryFile();
     reaFrontendSetParsingLibraryFile(1);
+    const char *previousReportPath = reaFrontendSwapReportPath(resolved);
     AST *ast = reaFrontendParseSource(source);
+    reaFrontendSwapReportPath(previousReportPath);
     reaFrontendSetParsingLibraryFile(was_parsing_library);
     if (!ast) {
+        gModuleLoadBroken = true;
         free(source);
         free(resolved);
         return NULL;
@@ -1350,6 +1387,7 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
     if (!verifyASTLinks(ast, NULL)) {
         fprintf(stderr, "AST verification failed while parsing module '%s'.\n", resolved);
         pascal_semantic_error_count++;
+        gModuleLoadBroken = true;
         freeAST(ast);
         free(source);
         free(resolved);
@@ -1360,8 +1398,14 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
 
     AST *moduleNode = findModuleNode(ast);
     if (!moduleNode || !moduleNode->token || !moduleNode->token->value) {
-        fprintf(stderr, "Module file '%s' does not contain a module declaration.\n", resolved);
+        if (frontendIsAether()) {
+            fprintf(stderr, "%s:1: [IMP-001] module file '%s' has no `mod Name { ... }` block: a "
+                            "module wraps its exports in one.\n", resolved, path);
+        } else {
+            fprintf(stderr, "Module file '%s' does not contain a module declaration.\n", resolved);
+        }
         pascal_semantic_error_count++;
+        gModuleLoadBroken = true;
         freeAST(ast);
         free(source);
         free(resolved);
@@ -1387,8 +1431,11 @@ static ReaModuleInfo *loadModuleRecursive(const char *path) {
         pushed_dir = true;
     }
 
+    const char *importingModulePath = gImportingModulePath;
+    gImportingModulePath = info->path;
     collectImportBindings(programDecls, &moduleBindings);
     collectImportBindings(decls, &moduleBindings);
+    gImportingModulePath = importingModulePath;
 
     collectModuleExports(info);
 
