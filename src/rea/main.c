@@ -176,16 +176,20 @@ typedef struct RuntimeLocationInfo {
     int line;
 } RuntimeLocationInfo;
 
+static void freeParsedDiagnosticFields(ParsedDiagnostic *diag) {
+    free(diag->file);
+    free(diag->phase);
+    free(diag->kind);
+    free(diag->code);
+    free(diag->message);
+    free(diag->hint);
+    free(diag->raw);
+}
+
 static void freeParsedDiagnostics(ParsedDiagnostic *items, int count) {
     if (!items) return;
     for (int i = 0; i < count; i++) {
-        free(items[i].file);
-        free(items[i].phase);
-        free(items[i].kind);
-        free(items[i].code);
-        free(items[i].message);
-        free(items[i].hint);
-        free(items[i].raw);
+        freeParsedDiagnosticFields(&items[i]);
     }
     free(items);
 }
@@ -587,6 +591,28 @@ static ParsedDiagnostic *collectDiagnosticsFromText(const char *text, int *outCo
     return items;
 }
 
+/* The warnings among `text`'s records. What a compile that succeeds prints
+ * besides them (--verbose and --dump-bytecode lines) is not a diagnostic. */
+static ParsedDiagnostic *collectWarningsFromText(const char *text, int *outCount) {
+    int count = 0;
+    int kept = 0;
+    ParsedDiagnostic *items = collectDiagnosticsFromText(text, &count);
+
+    for (int i = 0; i < count; i++) {
+        if (items[i].is_warning) {
+            items[kept++] = items[i];
+        } else {
+            freeParsedDiagnosticFields(&items[i]);
+        }
+    }
+    if (kept == 0) {
+        free(items);
+        items = NULL;
+    }
+    if (outCount) *outCount = kept;
+    return items;
+}
+
 static ParsedDiagnostic *collectRuntimeDiagnosticsFromText(const char *text,
                                                           const char *defaultFile,
                                                           int *outCount) {
@@ -739,12 +765,29 @@ static void emitDiagnosticsFromText(FILE *out, const char *text, int asToon) {
     freeParsedDiagnostics(items, count);
 }
 
+/* `warnings` (the compile's, taken from the pending set) follow the run-time
+ * records in the same array, so the first record is still the error. */
 static void emitRuntimeDiagnosticsFromText(FILE *out,
                                            const char *text,
                                            const char *defaultFile,
-                                           int asToon) {
+                                           int asToon,
+                                           ParsedDiagnostic *warnings,
+                                           int warningCount) {
     int count = 0;
     ParsedDiagnostic *items = collectRuntimeDiagnosticsFromText(text, defaultFile, &count);
+
+    if (warningCount > 0) {
+        ParsedDiagnostic *merged =
+            (ParsedDiagnostic *)realloc(items, (size_t)(count + warningCount) * sizeof(ParsedDiagnostic));
+        if (merged) {
+            memcpy(merged + count, warnings, (size_t)warningCount * sizeof(ParsedDiagnostic));
+            free(warnings);
+            items = merged;
+            count += warningCount;
+        } else {
+            freeParsedDiagnostics(warnings, warningCount);
+        }
+    }
 
     if (!items && count == 0) {
         if (asToon) {
@@ -762,6 +805,57 @@ static void emitRuntimeDiagnosticsFromText(FILE *out,
     }
 
     freeParsedDiagnostics(items, count);
+}
+
+/* The warnings of a program that compiled. They were captured with the rest of
+ * the compile's stderr and printed only if the compile failed, so under
+ * --diagnostics-json a program that compiled with NARROW-001 showed no warning
+ * at all, neither as a record nor as text. They are held for the run: a run-time
+ * error carries them in its array, otherwise they are an array of their own
+ * after the run. halt() leaves through exit() from inside the VM, with stderr
+ * still captured, so an atexit handler prints them then. */
+static ParsedDiagnostic *gPendingWarnings = NULL;
+static int gPendingWarningCount = 0;
+static int gPendingWarningsToon = 0;
+static DiagnosticCapture *gPendingRunCapture = NULL;
+
+static ParsedDiagnostic *takePendingWarnings(int *outCount) {
+    ParsedDiagnostic *items = gPendingWarnings;
+    *outCount = gPendingWarningCount;
+    gPendingWarnings = NULL;
+    gPendingWarningCount = 0;
+    return items;
+}
+
+static void flushPendingWarnings(void) {
+    int count = 0;
+    ParsedDiagnostic *items;
+
+    if (gPendingRunCapture) {
+        diagnosticCaptureEnd(gPendingRunCapture);
+        gPendingRunCapture = NULL;
+    }
+    items = takePendingWarnings(&count);
+    if (count > 0) {
+        if (gPendingWarningsToon) {
+            emitDiagnosticsToon(stderr, items, count);
+        } else {
+            emitDiagnosticsJson(stderr, items, count);
+        }
+    }
+    freeParsedDiagnostics(items, count);
+}
+
+static void holdPendingWarnings(ParsedDiagnostic *items, int count, int asToon) {
+    static int registered = 0;
+
+    freeParsedDiagnostics(gPendingWarnings, gPendingWarningCount);
+    gPendingWarnings = items;
+    gPendingWarningCount = count;
+    gPendingWarningsToon = asToon;
+    if (count > 0 && !registered) {
+        registered = atexit(flushPendingWarnings) == 0;
+    }
 }
 
 static bool isUnitListFresh(List* unit_list, time_t cache_mtime) {
@@ -1267,9 +1361,15 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     }
 
     diagnosticCaptureEnd(&diagCapture);
-    if (!compilation_ok && diagCapture.enabled) {
+    if (diagCapture.enabled) {
         char *diagText = diagnosticCaptureRead(&diagCapture);
-        emitDiagnosticsFromText(stderr, diagText, diagnostics_toon);
+        if (!compilation_ok) {
+            emitDiagnosticsFromText(stderr, diagText, diagnostics_toon);
+        } else {
+            int warningCount = 0;
+            ParsedDiagnostic *warnings = collectWarningsFromText(diagText, &warningCount);
+            holdPendingWarnings(warnings, warningCount, diagnostics_toon);
+        }
         free(diagText);
     }
     diagnosticCaptureDispose(&diagCapture);
@@ -1292,6 +1392,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
                 fprintf(stderr, "Warning: failed to initialize runtime diagnostics capture (%s); continuing without structured diagnostics.\n", strerror(errno));
                 runtimeDiagCapture.enabled = 0;
             }
+            if (runtimeDiagCapture.enabled) gPendingRunCapture = &runtimeDiagCapture;
             reaInstallSigint();
             VM vm;
             initVM(&vm);
@@ -1305,17 +1406,22 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             result = interpretBytecode(&vm, &chunk, globalSymbols, constGlobalSymbols, procedure_table, 0);
             g_sigint_vm = NULL;
             freeVM(&vm);
+            gPendingRunCapture = NULL;
             if (runtimeDiagCapture.enabled) {
                 diagnosticCaptureEnd(&runtimeDiagCapture);
                 if (result != INTERPRET_OK) {
+                    int warningCount = 0;
+                    ParsedDiagnostic *warnings = takePendingWarnings(&warningCount);
                     char *diagText = diagnosticCaptureRead(&runtimeDiagCapture);
-                    emitRuntimeDiagnosticsFromText(stderr, diagText, path, diagnostics_toon);
+                    emitRuntimeDiagnosticsFromText(stderr, diagText, path, diagnostics_toon,
+                                                   warnings, warningCount);
                     free(diagText);
                 }
                 diagnosticCaptureDispose(&runtimeDiagCapture);
             }
         }
     }
+    flushPendingWarnings();
 
     freeBytecodeChunk(&chunk);
     freeAST(program);
