@@ -82,3 +82,8 @@ In-depth language documentation is in [`docs/`](docs/):
 See [`src/rea/LANGUAGE_SPEC.md`](src/rea/LANGUAGE_SPEC.md) for the language
 specification and [`src/rea/README.md`](src/rea/README.md) for the front-end
 internals.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE); see [NOTICE](NOTICE)
+for copyright and third-party notices.
