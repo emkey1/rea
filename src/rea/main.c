@@ -941,6 +941,10 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
      * a static-library build would otherwise drop. */
     void PSCAL_FRONTEND_INSTALL_HOOKS(void);
     PSCAL_FRONTEND_INSTALL_HOOKS();
+#else
+    /* A host that runs every front end in one process (iOS) still holds the
+     * hooks of its last Aether run; Rea would parse through them. */
+    reaSetFrontendHooks(NULL);
 #endif
     /* Always start from a clean slate in case a prior in-process run aborted
      * early (e.g., exit()/halt during startup). */
