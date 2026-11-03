@@ -27,7 +27,6 @@
 /* Module parsing goes through reaFrontendParseSource() (see rea/frontend_hooks.h). */
 
 // Forward declaration from core/utils.c
-Token *newToken(TokenType type, const char *value, int line, int column);
 // Needed to evaluate class constant expressions at compile time
 Value evaluateCompileTimeValue(AST *node);
 

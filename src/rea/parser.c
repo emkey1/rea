@@ -4,6 +4,7 @@
 #include "symbol/symbol.h"
 #include "core/utils.h"
 #include "core/globals.h"
+#include "core/token_arena.h"
 #include "rea/frontend_hooks.h"
 #include "rea/semantic.h"
 #include <stdlib.h>
@@ -17,7 +18,6 @@
 #include "common/frontend_kind.h"
 
 // Forward declaration from core/utils.c
-Token *newToken(TokenType type, const char *value, int line, int column);
 // Provided by front-end stubs for Rea
 void insertType(const char* name, AST* typeDef);
 
@@ -2558,7 +2558,7 @@ static AST *parseVarDecl(ReaParser *p) {
 
     if (!tokenIsNameToken(p->current.type) && p->current.type != REA_TOKEN_LEFT_PAREN) return NULL;
 
-    AST *baseType = copyAST(typeNode); // copy uses original token pointers; keep until end
+    AST *baseType = copyAST(typeNode); // what each later name in the list copies
     AST *compound = newASTNode(AST_COMPOUND, NULL);
     if (compound) {
         compound->i_val = 1; // mark as declaration group wrapper
@@ -2577,12 +2577,13 @@ static AST *parseVarDecl(ReaParser *p) {
                 reaAdvance(p); // consume '*'
                 if (tokenIsNameToken(p->current.type)) {
                     Token *nameTok = copyCurrentTokenAsIdentifier(p);
-                    if (!nameTok) { freeAST(compound); return NULL; }
+                    if (!nameTok) { freeAST(compound); freeAST(baseType); return NULL; }
                     reaAdvance(p); // consume identifier
 
                     AST *baseForPointer = first ? typeNode : copyAST(baseType);
                     if (!baseForPointer) {
                         freeAST(compound);
+                        freeAST(baseType);
                         return NULL;
                     }
 
@@ -2590,12 +2591,14 @@ static AST *parseVarDecl(ReaParser *p) {
                         int idxPtr = p->currentClassName ? p->currentMethodIndex++ : -1;
                         AST *func = parseFunctionDecl(p, nameTok, baseForPointer, vtype, idxPtr, true);
                         freeAST(compound);
+                        freeAST(baseType);
                         return func;
                     }
 
                     AST *varDecl = parsePointerVariableAfterName(p, nameTok, baseForPointer);
                     if (!varDecl) {
                         freeAST(compound);
+                        freeAST(baseType);
                         return NULL;
                     }
                     addChild(compound, varDecl);
@@ -2622,7 +2625,7 @@ static AST *parseVarDecl(ReaParser *p) {
         if (!tokenIsNameToken(p->current.type)) break;
 
         Token *nameTok = copyCurrentTokenAsIdentifier(p);
-        if (!nameTok) { freeAST(compound); return NULL; }
+        if (!nameTok) { freeAST(compound); freeAST(baseType); return NULL; }
 
         reaAdvance(p); // consume identifier
 
@@ -2635,6 +2638,7 @@ static AST *parseVarDecl(ReaParser *p) {
         if (first && (p->current.type == REA_TOKEN_LEFT_PAREN || p->current.type == REA_TOKEN_LESS)) {
             int idx2 = p->currentClassName ? p->currentMethodIndex++ : -1;
             freeAST(compound);
+            freeAST(baseType);
             return parseFunctionDecl(p, nameTok, varType, vtype_local, idx2, false);
         }
 
@@ -2692,10 +2696,11 @@ static AST *parseVarDecl(ReaParser *p) {
         reaDiagf("L%d: Expected a declarator after type name '%s'.\n", p->current.line, tname);
         p->hadError = true;
         freeAST(compound);
+        freeAST(baseType);
         return NULL;
     }
 
-    // baseType shares token memory with typeNode; do not free to avoid double free
+    freeAST(baseType);
     if (compound->child_count == 1) {
         AST *only = compound->children[0];
         compound->children[0] = NULL;
@@ -4411,7 +4416,16 @@ void reaResolveForwardClassRefs(AST *node) {
     }
 }
 
+static AST *parseReaSource(const char *source);
+
 AST *parseRea(const char *source) {
+    size_t tokens = tokenArenaMark();
+    AST *program = parseReaSource(source);
+    tokenArenaRelease(tokens);
+    return program;
+}
+
+static AST *parseReaSource(const char *source) {
     ReaParser p;
     reaInitLexer(&p.lexer, source);
     p.currentFunctionType = TYPE_VOID;

@@ -5,12 +5,14 @@
 #include "compiler/compiler.h"
 #include "core/utils.h"
 #include "core/diagmap.h"
+#include "core/token_arena.h"
 #include "rea/parser.h"
 #include "rea/semantic.h"
 #include "symbol/symbol.h"
 
 static void reaResetParserState(void) {
     reaSetStrictMode(0);
+    tokenArenaRelease(0);
 }
 
 void reaResetSymbolState(void) {
@@ -26,6 +28,7 @@ void reaResetSymbolState(void) {
         freeHashTable(procedure_table);
         procedure_table = NULL;
     }
+    freeScopeTables();
     current_procedure_table = NULL;
     if (type_table) {
         freeTypeTableASTNodes();
