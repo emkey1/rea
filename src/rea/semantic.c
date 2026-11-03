@@ -45,8 +45,8 @@ typedef struct ClassInfo {
     bool vtable_slots_assigned; /* Layout is computed once per class; see assignClassVTableSlots */
 } ClassInfo;
 
-static HashTable *class_table = NULL;    /* Maps class name -> ClassInfo */
-static AST *gProgramRoot = NULL;         /* Needed for declaration lookups */
+static PSCAL_THREAD_LOCAL HashTable *class_table = NULL;    /* Maps class name -> ClassInfo */
+static PSCAL_THREAD_LOCAL AST *gProgramRoot = NULL;         /* Needed for declaration lookups */
 
 typedef enum {
     REA_MODULE_EXPORT_CONST,
@@ -87,12 +87,12 @@ typedef struct ReaModuleBindingList {
     int capacity;
 } ReaModuleBindingList;
 
-static ReaModuleInfo **gLoadedModules = NULL;
-static int gLoadedModuleCount = 0;
-static int gLoadedModuleCapacity = 0;
-static char **gFailedModulePaths = NULL;
-static int gFailedModulePathCount = 0;
-static int gFailedModulePathCapacity = 0;
+static PSCAL_THREAD_LOCAL ReaModuleInfo **gLoadedModules = NULL;
+static PSCAL_THREAD_LOCAL int gLoadedModuleCount = 0;
+static PSCAL_THREAD_LOCAL int gLoadedModuleCapacity = 0;
+static PSCAL_THREAD_LOCAL char **gFailedModulePaths = NULL;
+static PSCAL_THREAD_LOCAL int gFailedModulePathCount = 0;
+static PSCAL_THREAD_LOCAL int gFailedModulePathCapacity = 0;
 
 static void clearFailedModulePaths(void) {
     if (gFailedModulePaths) {
@@ -167,25 +167,25 @@ static void clearModuleCache(void) {
     clearFailedModulePaths();
 }
 
-static ReaModuleBindingList *gActiveBindings = NULL;
-static char *gReaSourcePath = NULL;
-static char **gModuleDirStack = NULL;
-static int gModuleDirDepth = 0;
-static int gModuleDirCapacity = 0;
+static PSCAL_THREAD_LOCAL ReaModuleBindingList *gActiveBindings = NULL;
+static PSCAL_THREAD_LOCAL char *gReaSourcePath = NULL;
+static PSCAL_THREAD_LOCAL char **gModuleDirStack = NULL;
+static PSCAL_THREAD_LOCAL int gModuleDirDepth = 0;
+static PSCAL_THREAD_LOCAL int gModuleDirCapacity = 0;
 /* Aether: the `use` targets that were not found (D82), for the SCOPE-001 hint
  * on a name one of them would have defined. */
 #define REA_MAX_MISSING_IMPORTS 8
-static char *gMissingImports[REA_MAX_MISSING_IMPORTS];
-static bool gMissingImportBroken[REA_MAX_MISSING_IMPORTS];
-static int gMissingImportCount = 0;
+static PSCAL_THREAD_LOCAL char *gMissingImports[REA_MAX_MISSING_IMPORTS];
+static PSCAL_THREAD_LOCAL bool gMissingImportBroken[REA_MAX_MISSING_IMPORTS];
+static PSCAL_THREAD_LOCAL int gMissingImportCount = 0;
 /* Why the last loadModuleRecursive() returned NULL: its file was missing, or
  * it was found and did not compile (Aether words the two apart). */
-static bool gModuleLoadBroken = false;
+static PSCAL_THREAD_LOCAL bool gModuleLoadBroken = false;
 /* The `use` being resolved: its line, and the module file it is written in
  * (NULL while the program's own file is read). Aether's import diagnostics
  * name that file. */
-static int gImportLine = 0;
-static const char *gImportingModulePath = NULL;
+static PSCAL_THREAD_LOCAL int gImportLine = 0;
+static PSCAL_THREAD_LOCAL const char *gImportingModulePath = NULL;
 static char *reaDupString(const char *s);
 static char *duplicateDirName(const char *path);
 static char *tryResolveFromRepository(const char *relative, bool *out_exists);
@@ -284,10 +284,10 @@ static void reportReaLineWarning(int line, const char *fmt, ...) {
     fprintf(stderr, "\n");
 }
 
-static char **gEnvImportPaths = NULL;
-static int gEnvImportPathCount = 0;
-static int gEnvImportPathCapacity = 0;
-static bool gEnvImportPathsLoaded = false;
+static PSCAL_THREAD_LOCAL char **gEnvImportPaths = NULL;
+static PSCAL_THREAD_LOCAL int gEnvImportPathCount = 0;
+static PSCAL_THREAD_LOCAL int gEnvImportPathCapacity = 0;
+static PSCAL_THREAD_LOCAL bool gEnvImportPathsLoaded = false;
 
 static void clearEnvImportPaths(void) {
     if (gEnvImportPaths) {
@@ -305,12 +305,12 @@ static void clearEnvImportPaths(void) {
 #define REA_IMPORT_PATH_ENV "REA_IMPORT_PATH"
 #define REA_DEFAULT_IMPORT_DIR "/usr/local/lib/rea"
 
-static char **gGenericTypeNames = NULL;
-static int gGenericTypeCount = 0;
-static int gGenericTypeCapacity = 0;
-static int *gGenericFrameStack = NULL;
-static int gGenericFrameDepth = 0;
-static int gGenericFrameCapacity = 0;
+static PSCAL_THREAD_LOCAL char **gGenericTypeNames = NULL;
+static PSCAL_THREAD_LOCAL int gGenericTypeCount = 0;
+static PSCAL_THREAD_LOCAL int gGenericTypeCapacity = 0;
+static PSCAL_THREAD_LOCAL int *gGenericFrameStack = NULL;
+static PSCAL_THREAD_LOCAL int gGenericFrameDepth = 0;
+static PSCAL_THREAD_LOCAL int gGenericFrameCapacity = 0;
 
 static bool ensureGenericNameCapacity(int needed) {
     if (gGenericTypeCapacity >= needed) return true;
@@ -1690,7 +1690,7 @@ static int countAccessibleExports(const char *name, ReaModuleBindingList *bindin
     return count;
 }
 
-static int gMatchTempCounter = 0;
+static PSCAL_THREAD_LOCAL int gMatchTempCounter = 0;
 
 static AST *cloneTypeForVar(VarType type, AST *typeDef, int line) {
     if (typeDef) {
@@ -2410,8 +2410,8 @@ static void ensureExceptionGlobals(AST *root) {
     }
 }
 
-static ClosureCaptureRegistry gClosureRegistry;
-static bool gClosureRegistryInitialized = false;
+static PSCAL_THREAD_LOCAL ClosureCaptureRegistry gClosureRegistry;
+static PSCAL_THREAD_LOCAL bool gClosureRegistryInitialized = false;
 
 static void ensureClosureRegistry(void) {
     if (!gClosureRegistryInitialized) {

@@ -1,4 +1,5 @@
 #include "rea/frontend_hooks.h"
+#include "core/globals.h"
 
 #include <stddef.h>
 
@@ -7,7 +8,7 @@
 #include "rea/state.h"
 
 /* Zero-initialised => every hook NULL => engine uses its built-in defaults. */
-static ReaFrontendHooks g_rea_frontend_hooks;
+static PSCAL_THREAD_LOCAL ReaFrontendHooks g_rea_frontend_hooks;
 
 void reaSetFrontendHooks(const ReaFrontendHooks *hooks) {
     if (hooks) {
@@ -115,7 +116,7 @@ const char *reaFrontendSwapReportPath(const char *path) {
     return g_rea_frontend_hooks.swapReportPath ? g_rea_frontend_hooks.swapReportPath(path) : NULL;
 }
 
-static int g_rea_parsing_library_file = 0;
+static PSCAL_THREAD_LOCAL int g_rea_parsing_library_file = 0;
 
 void reaFrontendSetParsingLibraryFile(int isLibraryFile) {
     g_rea_parsing_library_file = isLibraryFile ? 1 : 0;

@@ -89,7 +89,7 @@ static void initSymbolSystem(void) {
     current_procedure_table = procedure_table;
 }
 
-static VM *g_sigint_vm = NULL;
+static PSCAL_THREAD_LOCAL VM *g_sigint_vm = NULL;
 
 static void reaHandleSigint(int signo) {
     (void)signo;
@@ -814,10 +814,10 @@ static void emitRuntimeDiagnosticsFromText(FILE *out,
  * error carries them in its array, otherwise they are an array of their own
  * after the run. halt() leaves through exit() from inside the VM, with stderr
  * still captured, so an atexit handler prints them then. */
-static ParsedDiagnostic *gPendingWarnings = NULL;
-static int gPendingWarningCount = 0;
-static int gPendingWarningsToon = 0;
-static DiagnosticCapture *gPendingRunCapture = NULL;
+static PSCAL_THREAD_LOCAL ParsedDiagnostic *gPendingWarnings = NULL;
+static PSCAL_THREAD_LOCAL int gPendingWarningCount = 0;
+static PSCAL_THREAD_LOCAL int gPendingWarningsToon = 0;
+static PSCAL_THREAD_LOCAL DiagnosticCapture *gPendingRunCapture = NULL;
 
 static ParsedDiagnostic *takePendingWarnings(int *outCount) {
     ParsedDiagnostic *items = gPendingWarnings;
@@ -846,15 +846,19 @@ static void flushPendingWarnings(void) {
     freeParsedDiagnostics(items, count);
 }
 
+static void registerPendingWarningsFlush(void) {
+    atexit(flushPendingWarnings);
+}
+
 static void holdPendingWarnings(ParsedDiagnostic *items, int count, int asToon) {
-    static int registered = 0;
+    static pthread_once_t registered = PTHREAD_ONCE_INIT;
 
     freeParsedDiagnostics(gPendingWarnings, gPendingWarningCount);
     gPendingWarnings = items;
     gPendingWarningCount = count;
     gPendingWarningsToon = asToon;
-    if (count > 0 && !registered) {
-        registered = atexit(flushPendingWarnings) == 0;
+    if (count > 0) {
+        pthread_once(&registered, registerPendingWarningsFlush);
     }
 }
 

@@ -64,7 +64,7 @@ static ReaToken reaPeekToken2(ReaParser *p) {
  * is never silent (exit 1 with empty stderr was the worst case for both humans
  * and LLM repair loops -- nothing to react to). Mirrors aether's
  * g_aetherAstDiagCount backstop (ast_parser.c). */
-static int g_reaParseDiagCount = 0;
+static PSCAL_THREAD_LOCAL int g_reaParseDiagCount = 0;
 
 /* stderr diagnostic sink: identical to reaDiagf( ...) but bumps the
  * emitted-diagnostic counter so the silent-failure backstop can tell whether
@@ -104,7 +104,7 @@ static bool tokenIsTypeKeyword(ReaTokenType t);
 static Token *copyCurrentTokenAsIdentifier(ReaParser *p);
 
 // Strict mode control
-static int g_rea_strict_mode = 0;
+static PSCAL_THREAD_LOCAL int g_rea_strict_mode = 0;
 void reaSetStrictMode(int enable) { g_rea_strict_mode = enable ? 1 : 0; }
 
 // Strict scan for forbidden top-level constructs
