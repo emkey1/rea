@@ -23,6 +23,7 @@
 #else
 #include <unistd.h>
 #endif
+#include "common/path_virtualization.h"
 
 /* Module parsing goes through reaFrontendParseSource() (see rea/frontend_hooks.h). */
 

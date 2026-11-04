@@ -1234,6 +1234,11 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
 
     List *dep_files = createList();
     collectUsesClauses(program, dep_files);
+    /* A module's own imports count too: semantic analysis has loaded them all by now. */
+    for (int i = 0; i < reaFrontendGetLoadedModuleCount(); i++) {
+        const char *module_path = reaFrontendGetModulePath(i);
+        if (module_path) listAppend(dep_files, module_path);
+    }
     int dep_count = listSize(dep_files);
     const char **dep_array = NULL;
     if (dep_count > 0) {
@@ -1247,8 +1252,6 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     bool used_cache = 0;
     const char* cache_miss_reason = NULL;  // else pscalCacheLastLoadError()
     if (!no_cache) used_cache = loadBytecodeFromCache(path, kReaCompilerId, argv[0], dep_array, dep_count, &chunk);
-    if (dep_array) free(dep_array);
-    freeList(dep_files);
     if (used_cache) {
 #if defined(__APPLE__)
 #define PSCAL_STAT_SEC(st) ((st).st_mtimespec.tv_sec)
@@ -1305,7 +1308,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
         }
         if (compilation_ok) {
             finalizeBytecode(&chunk);
-            if (!no_cache) saveBytecodeToCache(path, kReaCompilerId, &chunk);
+            if (!no_cache) saveBytecodeToCacheWithDependencies(path, kReaCompilerId, dep_array, dep_count, &chunk);
             // VM 2.0 Phase 2b (plan §5.7): link AFTER saving to cache, never
             // before -- see compiler.c's compileASTToBytecode() comment.
             // Must also run before the disassembly below.
@@ -1348,6 +1351,8 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             }
         }
     }
+    if (dep_array) free(dep_array);
+    freeList(dep_files);
 
     diagnosticCaptureEnd(&diagCapture);
     if (diagCapture.enabled) {
