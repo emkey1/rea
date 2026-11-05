@@ -815,6 +815,14 @@ static char *tryResolveRelativePath(const char *relative, bool *out_exists) {
         return repoResolved;
     }
 
+    char besideBinary[PATH_MAX];
+    if (pscalLibDirBesideExecutable("rea", besideBinary, sizeof(besideBinary))) {
+        char *besideResolved = tryResolveFromDirectory(besideBinary, relative, out_exists);
+        if (besideResolved) {
+            return besideResolved;
+        }
+    }
+
     char *defaultResolved = tryResolveFromDirectory(REA_DEFAULT_IMPORT_DIR, relative, out_exists);
     if (defaultResolved) {
         return defaultResolved;

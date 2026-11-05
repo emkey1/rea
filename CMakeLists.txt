@@ -112,6 +112,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     # fetched pscal-core dependency declares no install rules of its own.
     include(GNUInstallDirs)
     install(TARGETS rea RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    # Rea finds these as <dir above the binary>/lib/rea, wherever --prefix points.
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/rea/ DESTINATION lib/rea)
     install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/examples/
             DESTINATION ${CMAKE_INSTALL_DATADIR}/rea/examples)
     install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/docs/

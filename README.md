@@ -37,7 +37,8 @@ with.
 cmake --install build --prefix /usr/local
 ```
 
-This puts the `rea` binary in `<prefix>/bin`, the example programs in
+This puts the `rea` binary in `<prefix>/bin`, its library modules in
+`<prefix>/lib/rea`, the example programs in
 `<prefix>/share/rea/examples`, and the language docs in `<prefix>/share/doc/rea`.
 The fetched `pscal-core` also installs its static library and headers under the
 same prefix.
