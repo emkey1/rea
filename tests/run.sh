@@ -344,6 +344,11 @@ run_rea_fixture() {
         return
     fi
 
+    if [ "$REA_CRT_AVAILABLE" -ne 1 ] && [ "$test_name" = "import_crt_constants" ]; then
+        harness_report SKIP "rea_${test_name}" "Rea fixture $test_name" "crt module not found"
+        return
+    fi
+
     local arg_list=()
     local args_source=""
     local args_file_present=0
@@ -1147,6 +1152,16 @@ else
     REA_THREED_AVAILABLE=0
 fi
 
+# The crt module comes from REA_IMPORT_PATH, an installed lib/rea, or a lib/rea above
+# the source file or the current directory, as in the umbrella. A clone of this repo
+# on its own has none of them. Only that message skips: any other failure still fails
+# the tests that import crt.
+crt_probe=$("$REA_BIN" --no-cache --no-run rea/import_crt_constants.rea 2>&1 || true)
+case "$crt_probe" in
+    *"unable to open module 'crt'"*) REA_CRT_AVAILABLE=0 ;;
+    *) REA_CRT_AVAILABLE=1 ;;
+esac
+
 shopt -s nullglob
 for src in "$TESTS_DIR"/rea/*.rea; do
     test_name=$(basename "$src" .rea)
@@ -1154,7 +1169,9 @@ for src in "$TESTS_DIR"/rea/*.rea; do
 done
 shopt -u nullglob
 
-if details=$(rea_hangman_example); then
+if [ "$REA_CRT_AVAILABLE" -ne 1 ]; then
+    harness_report SKIP "rea_hangman_example" "Hangman example emits vtable before constructor" "crt module not found"
+elif details=$(rea_hangman_example); then
     harness_report PASS "rea_hangman_example" "Hangman example emits vtable before constructor"
 else
     harness_report FAIL "rea_hangman_example" "Hangman example emits vtable before constructor" "$details"
