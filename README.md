@@ -26,6 +26,11 @@ cmake --build build -j
 ./build/rea --no-cache program.rea
 ```
 
+A plain configure gives `RelWithDebInfo` (`-O2 -g`). Pass
+`-DCMAKE_BUILD_TYPE=Debug` for a debugger or a sanitizer, or `Release` for `-O3`
+with no debug info. A build directory keeps the type it was first configured
+with.
+
 ## Install
 
 ```sh

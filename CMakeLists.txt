@@ -11,6 +11,17 @@
 cmake_minimum_required(VERSION 3.18)
 project(rea C)
 
+# Default to an optimised build that keeps its line numbers for crash reports. With
+# no build type CMake compiles at -O0. The default is a cache value, so
+# -DCMAKE_BUILD_TYPE=Debug (or any other) still wins. Consumed as a dependency (e.g.
+# by the aether repo), rea leaves the choice to the project that pulled it in.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+        set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type (default RelWithDebInfo)" FORCE)
+    endif()
+    message(STATUS "Rea build type: ${CMAKE_BUILD_TYPE}")
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 add_compile_options(-Wall)
