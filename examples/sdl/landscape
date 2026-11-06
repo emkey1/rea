@@ -2306,6 +2306,13 @@ class LandscapeDemo {
     if (actualHeight > 0) WindowHeight = actualHeight;
     GLViewport(0, 0, WindowWidth, WindowHeight);
     GLSetSwapInterval(1);
+    // The shader clouds need an OpenGL context; the SDL renderer path
+    // (the macOS default) has none, so fall back to the cloud sprites.
+    if (my.shaderCloudsAvailable &&
+        (!hasextbuiltin("user", "LandscapeShadersAvailable") ||
+         !LandscapeShadersAvailable())) {
+      my.shaderCloudsAvailable = false;
+    }
     my.setupLighting();
     writeln("Controls: W/S or Up/Down to move, A/D or Left/Right to turn, use the mouse to look around. N/P change seed, R randomizes, F toggles fast draw, B toggles the biome tour, K captures a PNG, Q or Esc exits.");
     if (my.fastDrawEnabled) {
