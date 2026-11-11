@@ -77,6 +77,7 @@ static void reaHandleSigint(int signo) {
     if (g_sigint_vm) {
         g_sigint_vm->abort_requested = true;
         g_sigint_vm->exit_requested = true;
+        g_sigint_vm->ended_by_interrupt = true;
     }
 }
 
@@ -1282,6 +1283,7 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     }
 
     InterpretResult result = INTERPRET_COMPILE_ERROR;
+    bool interrupted = false;
     bool compilation_ok = true;
     if (!used_cache) {
         int moduleCount = reaFrontendGetLoadedModuleCount();
@@ -1399,6 +1401,10 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
             g_sigint_vm = &vm;
             result = interpretBytecode(&vm, &chunk, globalSymbols, constGlobalSymbols, procedure_table, 0);
             g_sigint_vm = NULL;
+            interrupted = vmRunWasInterrupted(&vm);   // Ctrl-C: 130, and no runtime-error report
+            if (interrupted) {
+                result = INTERPRET_OK;
+            }
             freeVM(&vm);
             gPendingRunCapture = NULL;
             if (runtimeDiagCapture.enabled) {
@@ -1422,7 +1428,8 @@ int PSCAL_FRONTEND_MAIN_NAME(int argc, char **argv) {
     freeProcedureTable();
     if (preprocessed_source) free(preprocessed_source);
     free(src);
-    REA_RETURN(vmExitWithCleanup(result == INTERPRET_OK ? EXIT_SUCCESS : EXIT_FAILURE));
+    REA_RETURN(vmExitWithCleanup(interrupted ? 128 + SIGINT
+                                             : (result == INTERPRET_OK ? EXIT_SUCCESS : EXIT_FAILURE)));
 }
 #undef REA_RETURN
 
