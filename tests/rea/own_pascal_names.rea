@@ -1,0 +1,7 @@
+// delete, insert, move, assigned and gettickcount are Pascal's builtins only;
+// a Rea program can name its own functions after them.
+int delete(int x) { return x - 1; }
+int insert(int x) { return x + 1; }
+int move(int a, int b) { return a * b; }
+int gettickcount() { return 7; }
+writeln(delete(5), " ", insert(5), " ", move(3, 4), " ", gettickcount());
