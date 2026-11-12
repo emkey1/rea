@@ -1,0 +1,8 @@
+// strinsert(s, pos, t) and strdelete(s, pos, n) return a new string; positions
+// are 1-based like copy and pos, and are clipped to the string.
+str s = "Hello World";
+writeln("[" + strinsert(s, 6, ",") + "]");
+writeln("[" + strinsert(s, 100, "!") + "]");
+writeln("[" + strdelete(s, 6, 1) + "]");
+writeln("[" + strdelete(s, 6, 100) + "]");
+writeln("[" + s + "]");

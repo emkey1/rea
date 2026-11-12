@@ -112,6 +112,12 @@ Rea code can call any PSCAL VM built‑in, including I/O (`writeln`, `printf`),
 string helpers, math functions, and threading primitives such as `spawn`,
 `join`, `mutex`, `lock`, and `unlock`.
 
+Strings are edited with functions that return a new string; positions count
+from 1, as in `copy` and `pos`, and are clipped to the string:
+`strinsert(s, pos, t)` puts `t` before position `pos`, and
+`strdelete(s, pos, n)` removes `n` characters from `pos`. `getenv(name)` reads
+an environment variable and `realtimeclock()` gives the time in seconds.
+
 When PSCAL is compiled with SDL support, the same graphics and audio helpers used by Pascal are available to Rea programs. The 3D layer includes `InitGraph3D`, `GLSwapWindow`, `GLSetSwapInterval`, and a collection of fixed-function helpers (`GLClearColor`, `GLClear`, `GLClearDepth`, `GLMatrixMode`, `GLLoadIdentity`, `GLTranslatef`, `GLRotatef`, `GLScalef`, `GLPerspective`, `GLFrustum`, `GLBegin`/`GLEnd`, `GLColor3f`, `GLColor4f`, `GLVertex3f`, `GLNormal3f`, `GLLineWidth`, `GLDepthMask`, `GLDepthFunc`, `GLEnable`, `GLDisable`, `GLCullFace`, `GLShadeModel`, `GLLightfv`, `GLMaterialfv`, `GLMaterialf`, `GLColorMaterial`, `GLBlendFunc`, `GLViewport`, `GLDepthTest`, ...). A short render loop looks like:
 
 ```rea
