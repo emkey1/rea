@@ -118,6 +118,11 @@ from 1, as in `copy` and `pos`, and are clipped to the string:
 `strdelete(s, pos, n)` removes `n` characters from `pos`. `getenv(name)` reads
 an environment variable and `realtimeclock()` gives the time in seconds.
 
+To change a string variable in place, call its methods: `s.insert(pos, t)`
+is `s = strinsert(s, pos, t)` and `s.remove(pos, n)` is
+`s = strdelete(s, pos, n)`. They work on a variable, a field or an array
+element, and return nothing.
+
 When PSCAL is compiled with SDL support, the same graphics and audio helpers used by Pascal are available to Rea programs. The 3D layer includes `InitGraph3D`, `GLSwapWindow`, `GLSetSwapInterval`, and a collection of fixed-function helpers (`GLClearColor`, `GLClear`, `GLClearDepth`, `GLMatrixMode`, `GLLoadIdentity`, `GLTranslatef`, `GLRotatef`, `GLScalef`, `GLPerspective`, `GLFrustum`, `GLBegin`/`GLEnd`, `GLColor3f`, `GLColor4f`, `GLVertex3f`, `GLNormal3f`, `GLLineWidth`, `GLDepthMask`, `GLDepthFunc`, `GLEnable`, `GLDisable`, `GLCullFace`, `GLShadeModel`, `GLLightfv`, `GLMaterialfv`, `GLMaterialf`, `GLColorMaterial`, `GLBlendFunc`, `GLViewport`, `GLDepthTest`, ...). A short render loop looks like:
 
 ```rea

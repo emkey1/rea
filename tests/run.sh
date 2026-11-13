@@ -578,6 +578,45 @@ EOF
     return 1
 }
 
+# s.insert and s.remove change a string in place, so they need a variable to
+# change and are not expressions. Bespoke (not a fixture) because
+# run_rea_fixture treats any nonzero exit as a failure.
+rea_str_method_rejects_test() {
+    local src_dir
+    src_dir=$(mktemp -d)
+    local issues=()
+
+    printf '%s\n' 'str s = "ab";' 'str t = s.insert(1, "x");' > "$src_dir/AsValue.rea"
+    printf '%s\n' 'str s = "ab";' 's.remove(1);' > "$src_dir/OneArg.rea"
+
+    local name expect
+    for name in AsValue OneArg; do
+        case "$name" in
+            AsValue) expect="'insert' changes the string in place and returns nothing; use strinsert() for a new string" ;;
+            *) expect="'remove' takes two arguments: a position and a count" ;;
+        esac
+        set +e
+        (cd "$src_dir" && "$REA_BIN" --no-cache "$name.rea" > "$src_dir/$name.out" 2> "$src_dir/$name.err")
+        local status=$?
+        set -e
+        if [ $status -eq 0 ]; then
+            issues+=("$name: expected nonzero exit")
+        fi
+        if ! grep -qF "$expect" "$src_dir/$name.err"; then
+            issues+=("$name: missing diagnostic '$expect'; stderr was: $(cat "$src_dir/$name.err")")
+        fi
+    done
+
+    rm -rf "$src_dir"
+
+    if [ ${#issues[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "${issues[@]}"
+    return 1
+}
+
 # A class/record type exported from a `module { }` block must stay resolvable
 # -- for var-decl typing and for field access (p.x) -- while later units
 # (including the importing program) are analyzed. Regression for a bug where
@@ -1201,6 +1240,12 @@ if details=$(rea_field_default_rejects_test); then
     harness_report PASS "rea_field_default_rejects" "Non-constant/mismatched class field defaults are rejected"
 else
     harness_report FAIL "rea_field_default_rejects" "Non-constant/mismatched class field defaults are rejected" "$details"
+fi
+
+if details=$(rea_str_method_rejects_test); then
+    harness_report PASS "rea_str_method_rejects" "s.insert and s.remove are statements with two arguments"
+else
+    harness_report FAIL "rea_str_method_rejects" "s.insert and s.remove are statements with two arguments" "$details"
 fi
 
 if details=$(rea_cache_reuse_test); then

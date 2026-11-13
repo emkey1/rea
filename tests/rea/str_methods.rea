@@ -1,0 +1,35 @@
+// s.insert(pos, t) and s.remove(pos, n) change the string s in place;
+// positions count from 1 and are clipped, as in strinsert and strdelete.
+class Box { str t; }
+class Other { void insert(int a, str b) { writeln("Other.insert ", a, " ", b); } }
+str g = "abc";
+int calls = 0;
+int one() { calls = calls + 1; return 1; }
+void f(str a) {
+  str loc = "Hello World";
+  loc.insert(6, ",");
+  writeln("[" + loc + "]");
+  a.remove(1, 1);
+  writeln("[" + a + "]");
+  g.insert(100, "!");
+}
+str s = "Hello World";
+s.insert(6, ",");
+writeln("[" + s + "]");
+s.remove(6, 1);
+writeln("[" + s + "]");
+s.remove(6, 100);
+writeln("[" + s + "]");
+str arr[3];
+arr[1] = "xyz";
+arr[one()].insert(1, "q");
+writeln("[" + arr[1] + "] calls=" + inttostr(calls));
+Box b = new Box();
+b.t = "field";
+b.t.remove(1, 1);
+writeln("[" + b.t + "]");
+str p = "pass";
+f(p);
+writeln("[" + p + "] [" + g + "]");
+Other o = new Other();
+o.insert(3, "x");
