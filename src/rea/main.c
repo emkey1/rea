@@ -106,7 +106,7 @@ static void reaInstallSigint(void) {
 static const char *REA_USAGE =
     "Usage: " PSCAL_FRONTEND_USAGE_NAME " <options> <source> [program_parameters...]\n"
     "   Options:\n"
-    "     -v                     Display version.\n"
+    "     -v, --version          Display version.\n"
     "     --dump-ast-json        Dump AST to JSON and exit.\n"
 #ifdef PSCAL_FRONTEND_HAS_REWRITE_DUMP
     "     --dump-rewrite         Dump frontend-rewritten source and exit.\n"
@@ -125,6 +125,9 @@ static const char *REA_USAGE =
     "     --diagnostics-json     Emit compiler diagnostics as JSON on failure.\n"
     "     --diagnostics-toon     Emit compiler diagnostics as TOON on failure.\n"
     "     --vm-trace-head=N      Trace first N instructions in the VM (also enabled by '{trace on}' in source).\n"
+    "     --deny LIST            Refuse builtins of these effect classes: io,net,proc,clock,random,ext,all.\n"
+    "     --fx-record FILE       Record the results of effectful builtins to FILE.\n"
+    "     --fx-replay FILE       Replay effectful builtins from a recorded FILE.\n"
     "\n"
     "   Thread helpers available to JSON snippets and the REPL:\n"
     "     thread_spawn_named(target, name, ...)  Launch allow-listed builtin on worker thread.\n"
